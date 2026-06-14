@@ -12,6 +12,7 @@ teammate, fitted tyre-deg slope. Telemetry is 2018+.
 import argparse
 import datetime
 import os
+import sqlite3
 import statistics
 from typing import Any, Dict, List
 
@@ -20,6 +21,35 @@ from pitwall_bake.transform import decimate_by_distance, is_green_lap, pack_chan
 from pitwall_bake.write_db import write_telemetry_db
 
 RACE_TYPES = {"R", "S"}  # race + sprint carry race-pace meaning
+
+# Default to the bundled f1db.db relative to this file (tools/bake/bake.py -> repo root -> composeResources).
+_DEFAULT_F1DB = os.path.normpath(os.path.join(
+    os.path.dirname(__file__), "..", "..",
+    "composeApp", "src", "commonMain", "composeResources", "files", "f1db.db"))
+
+
+def load_abbr_slug_map(f1db_path: str, year: int) -> Dict[str, str]:
+    """{UPPERCASE 3-letter code -> f1db driver slug} for one season, read from the bundled f1db.db.
+
+    Abbreviations collide across f1db's whole historical roster (HAM = 3 drivers), but are unique
+    *within a season* — so we scope the join to ``year`` via race_result. Returns {} (extract then
+    falls back to the slugified ergast id) if f1db is absent or the season has no results yet.
+    """
+    if not f1db_path or not os.path.exists(f1db_path):
+        print(f"  warn: f1db not found at {f1db_path}; driver_ids fall back to abbreviations")
+        return {}
+    try:
+        conn = sqlite3.connect(f1db_path)
+        rows = conn.execute(
+            "SELECT DISTINCT d.abbreviation, d.id FROM race_result rr "
+            "JOIN race r ON rr.race_id = r.id JOIN driver d ON rr.driver_id = d.id "
+            "WHERE r.year = ? AND d.abbreviation IS NOT NULL",
+            (year,)).fetchall()
+        conn.close()
+    except Exception as e:  # f1db schema drift / locked file — degrade gracefully
+        print(f"  warn: f1db abbr map unavailable for {year}: {e}")
+        return {}
+    return {str(ab).upper(): did for ab, did in rows}
 
 
 def _pack_channel_row(raw: Dict[str, Any], step_m: float):
@@ -85,8 +115,9 @@ def _build_pace(laps: List[Dict[str, Any]], drivers: Dict[str, Dict[str, str]]) 
     return pace
 
 
-def bake_one(out: str, year: int, rnd: int, stype: str, step_m: float, baked_at: str) -> Dict[str, int]:
-    extracted = load_session(year, rnd, stype)
+def bake_one(out: str, year: int, rnd: int, stype: str, step_m: float, baked_at: str,
+             slug_for_abbr: Dict[str, str] = None) -> Dict[str, int]:
+    extracted = load_session(year, rnd, stype, slug_for_abbr=slug_for_abbr)
     drivers = extracted["drivers"]
     labels = {d: m.get("label", d) for d, m in drivers.items()}
 
@@ -115,18 +146,24 @@ def main():
     ap.add_argument("--sessions", nargs="+", required=True, help="YEAR:ROUND:SESSION e.g. 2024:1:R")
     ap.add_argument("--step-m", type=float, default=25.0, help="distance decimation step in metres")
     ap.add_argument("--cache", default="fastf1cache", help="FastF1 cache dir (block storage in prod)")
+    ap.add_argument("--f1db", default=_DEFAULT_F1DB,
+                    help="path to bundled f1db.db (for the season-scoped abbreviation->slug map)")
     args = ap.parse_args()
 
     os.makedirs(args.cache, exist_ok=True)
     enable_cache(args.cache)
     baked_at = datetime.date.today().isoformat()
 
+    f1db_maps: Dict[int, Dict[str, str]] = {}  # cache the abbr->slug map per season
     for spec in args.sessions:
         year, rnd, stype = spec.split(":")
-        if int(year) < 2018:
+        y = int(year)
+        if y < 2018:
             print(f"skip {spec}: telemetry is 2018+ only")
             continue
-        stats = bake_one(args.out, int(year), int(rnd), stype, args.step_m, baked_at)
+        if y not in f1db_maps:
+            f1db_maps[y] = load_abbr_slug_map(args.f1db, y)
+        stats = bake_one(args.out, y, int(rnd), stype, args.step_m, baked_at, f1db_maps[y])
         print(f"baked {spec}: {stats}")
     print(f"done -> {os.path.abspath(args.out)}")
 

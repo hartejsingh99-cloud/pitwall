@@ -40,8 +40,16 @@ def enable_cache(cache_dir: str) -> None:
     fastf1.Cache.enable_cache(cache_dir)
 
 
-def load_session(year: int, rnd: int, session_type: str) -> Dict[str, Any]:
-    """Return a plain-Python payload-precursor for one session (channels still RAW/undecimated)."""
+def load_session(year: int, rnd: int, session_type: str, slug_for_abbr: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    """Return a plain-Python payload-precursor for one session (channels still RAW/undecimated).
+
+    ``slug_for_abbr`` maps an UPPERCASE 3-letter code (FastF1's lap 'Driver', e.g. 'VER') to the
+    canonical f1db driver slug (e.g. 'max-verstappen'). FastF1's *lap* rows carry no DriverId, so
+    without this the driver_id falls back to the lowercased abbreviation ('ver') and never joins the
+    f1db-keyed hero race-pace column. The caller scopes the map to the session's season (abbreviations
+    are unique within a season), so it's unambiguous; any code absent from the map falls back to the
+    slugified ergast id, then the abbreviation.
+    """
     import fastf1
 
     session = fastf1.get_session(year, rnd, session_type)
@@ -59,9 +67,9 @@ def load_session(year: int, rnd: int, session_type: str) -> Dict[str, Any]:
     for _, lap in session.laps.iterrows():
         abbr = str(lap.get("Driver", "") or "")
         raw_did = str(lap.get("DriverId", "") or "")
-        did = _slugify(raw_did, abbr)
+        did = (slug_for_abbr or {}).get(abbr.upper()) or _slugify(raw_did, abbr)
         if did not in drivers:
-            drivers[did] = {"label": f"{abbr}", "team": str(lap.get("Team", "") or "")}
+            drivers[did] = {"label": abbr or did, "team": str(lap.get("Team", "") or "")}
 
         lap_no = lap.get("LapNumber")
         if lap_no is None:

@@ -68,6 +68,7 @@ fun scaleToCanvas(
     w: Double,
     h: Double,
     pad: Double = 0.0,
+    preserveAspect: Boolean = false,
 ): Pair<List<Double>, List<Double>> {
     require(xs.size == ys.size) { "xs and ys must be the same length" }
     val innerW = w - 2 * pad
@@ -75,6 +76,18 @@ fun scaleToCanvas(
     val minX = xs.minOrNull() ?: 0.0; val maxX = xs.maxOrNull() ?: 0.0
     val minY = ys.minOrNull() ?: 0.0; val maxY = ys.maxOrNull() ?: 0.0
     val rangeX = maxX - minX; val rangeY = maxY - minY
+
+    // A track map must keep its true proportions — Monaco has to look like Monaco, not stretched to the
+    // canvas box. So scale BOTH axes by one uniform factor and center the result. The default below
+    // (independent per-axis fill) is correct for distance/time traces, where aspect is meaningless.
+    if (preserveAspect && rangeX != 0.0 && rangeY != 0.0) {
+        val s = minOf(innerW / rangeX, innerH / rangeY)
+        val offX = pad + (innerW - rangeX * s) / 2.0   // center the drawn shape in the leftover space
+        val offY = pad + (innerH - rangeY * s) / 2.0
+        val px = xs.map { offX + (it - minX) * s }
+        val py = ys.map { offY + (maxY - it) * s }      // flip: max data-y -> top
+        return px to py
+    }
 
     val px = xs.map { if (rangeX == 0.0) w / 2.0 else pad + (it - minX) / rangeX * innerW }
     val py = ys.map {

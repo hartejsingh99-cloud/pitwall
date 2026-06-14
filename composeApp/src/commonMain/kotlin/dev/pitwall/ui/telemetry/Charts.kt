@@ -64,7 +64,8 @@ fun TrackMapCanvas(
     val fast = Color(0xFF2E7D32)
     Canvas(modifier) {
         if (x.size < 2 || x.size != y.size) return@Canvas
-        val (px, py) = scaleToCanvas(x, y, size.width.toDouble(), size.height.toDouble(), pad = 12.0)
+        // preserveAspect: the racing line must keep the circuit's true proportions, not stretch to fill.
+        val (px, py) = scaleToCanvas(x, y, size.width.toDouble(), size.height.toDouble(), pad = 12.0, preserveAspect = true)
         val iLo = intensity?.minOrNull() ?: 0.0
         val iHi = intensity?.maxOrNull() ?: 1.0
         val range = (iHi - iLo).takeIf { it != 0.0 } ?: 1.0

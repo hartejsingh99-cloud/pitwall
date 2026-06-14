@@ -16,6 +16,9 @@ jobs:
       - uses: android-actions/setup-android@v4
         with: { log-accepted-android-sdk-licenses: false }
       - run: ./scripts/fetch_f1db.sh && ./scripts/fetch_telemetry.sh
+        env:
+          # Real bake hosted as a Release asset (see vars.TELEMETRY_URL). Unset -> synthetic sample.
+          TELEMETRY_URL: ${{ vars.TELEMETRY_URL }}
       - run: ./gradlew :composeApp:assembleDebug
       # Rename so the friend-facing asset is "PitWall-<tag>.apk" — no F1 mark in any downloaded filename.
       - name: Name the APK
@@ -32,6 +35,9 @@ jobs:
       - uses: android-actions/setup-android@v4
         with: { log-accepted-android-sdk-licenses: false }
       - run: ./scripts/fetch_f1db.sh && ./scripts/fetch_telemetry.sh
+        env:
+          # Real bake hosted as a Release asset (see vars.TELEMETRY_URL). Unset -> synthetic sample.
+          TELEMETRY_URL: ${{ vars.TELEMETRY_URL }}
       - run: ./gradlew :composeApp:packageDmg
       - uses: actions/upload-artifact@v7
         with: { name: dmg, path: composeApp/build/compose/binaries/main/dmg/*.dmg, if-no-files-found: error }

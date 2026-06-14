@@ -108,4 +108,22 @@ class DeltaTimeTest {
         assertTrue(px.all { it == 50.0 })
         assertTrue(py.all { it == 20.0 })
     }
+
+    @Test fun scaleToCanvas_preserveAspect_usesUniformScaleAndCenters() {
+        // Data is 2:1 (wider than tall) in a square box. preserveAspect must scale BOTH axes by the
+        // SAME factor (no stretch) and center the shorter axis — so a circuit keeps its real shape.
+        val (px, py) = scaleToCanvas(
+            listOf(0.0, 10.0), listOf(0.0, 5.0), w = 100.0, h = 100.0, pad = 0.0, preserveAspect = true,
+        )
+        // x is the binding axis (100/10=10 < 100/5=20) -> fills full width.
+        assertEquals(0.0, px.first(), 1e-9)
+        assertEquals(100.0, px.last(), 1e-9)
+        // y uses the SAME scale (10) -> drawn height 50, centered in 100 -> spans [25,75], still flipped.
+        assertEquals(75.0, py.first(), 1e-9)   // min data-y -> lower pixel
+        assertEquals(25.0, py.last(), 1e-9)    // max data-y -> upper pixel
+        // The decisive anti-distortion assertion: per-axis pixels-per-unit are identical.
+        val xScale = (px.last() - px.first()) / (10.0 - 0.0)
+        val yScale = (py.first() - py.last()) / (5.0 - 0.0)
+        assertEquals(xScale, yScale, 1e-9)
+    }
 }
