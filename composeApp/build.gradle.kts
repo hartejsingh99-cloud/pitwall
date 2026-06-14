@@ -15,14 +15,18 @@ kotlin {
         }
     }
 
-    jvm("desktop")
+    jvm("desktop") {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
 
     sourceSets {
         commonMain.dependencies {
-            implementation("org.jetbrains.compose.runtime:runtime:1.11.1")
-            implementation("org.jetbrains.compose.foundation:foundation:1.11.1")
-            implementation("org.jetbrains.compose.material3:material3:1.11.1")
-            implementation("org.jetbrains.compose.components:components-resources:1.11.1")
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.components.resources)
         }
 
         val desktopMain by getting {
@@ -57,7 +61,7 @@ compose.desktop {
         mainClass = "dev.pitwall.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg)
             packageName = "PitWall"
             packageVersion = "0.1.0"
         }
