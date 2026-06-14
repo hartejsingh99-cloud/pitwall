@@ -1,45 +1,211 @@
--- Schema declarations matching the bundled f1db (subset) so SQLDelight can map result rows.
--- Tables already exist in the bundled DB, so we NEVER call F1db.Schema.create().
+-- ============================================================================
+-- PitWall schema declarations for the bundled f1db SQLite (a CC-BY-4.0 dataset).
+--
+-- These CREATE statements exist ONLY so SQLDelight can type the generated queries.
+-- The bundled DB already contains the real tables/views, so we NEVER call
+-- F1db.Schema.create(). Two consequences shape how this file is written:
+--
+--   1. Subset columns are fine. Every query lists explicit columns (never SELECT *),
+--      and those columns exist in the real table at runtime — so we only declare the
+--      columns we actually read.
+--   2. Types are normalized for codegen, not copied from the real DDL. SQLDelight maps
+--      a column to a Kotlin type from its DECLARED name: TEXT->String, INTEGER->Long,
+--      REAL->Double. The real DB uses VARCHAR/DATE/DECIMAL/BOOLEAN; we rewrite those to
+--      TEXT (incl. ISO date strings), REAL (fractional points), and INTEGER (0/1 booleans,
+--      compared `== 1L` in Kotlin). Views are stub SELECTs whose literals encode nullability:
+--      `CAST(NULL AS T)` -> nullable (T?), a literal (0 / '' / 0.0) -> non-null.
+--
+-- CRITICAL nullability (verified against the bundle): from 2006+ qualifying_result.time_millis
+-- is almost always NULL; the real lap time lives in q3/q2/q1_millis. Every "lap time" read must
+-- COALESCE(q3_millis, q2_millis, q1_millis, time_millis). position_number is NULL for any
+-- DNF/DNS/NC/DSQ — order by position_display_order (always populated), and read position_text
+-- verbatim for status. Poles come from race_result.pole_position, never qualifying P1.
+-- ============================================================================
+
+-- ---- Core entities -------------------------------------------------------
 CREATE TABLE driver (
-  id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, full_name TEXT NOT NULL,
-  abbreviation TEXT NOT NULL, permanent_number TEXT, nationality_country_id TEXT NOT NULL
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  abbreviation TEXT NOT NULL,
+  permanent_number TEXT,
+  nationality_country_id TEXT NOT NULL,
+  total_championship_wins INTEGER NOT NULL,
+  total_race_entries INTEGER NOT NULL,
+  total_race_starts INTEGER NOT NULL,
+  total_race_wins INTEGER NOT NULL,
+  total_podiums INTEGER NOT NULL,
+  total_points REAL NOT NULL,
+  total_pole_positions INTEGER NOT NULL,
+  total_fastest_laps INTEGER NOT NULL,
+  total_sprint_race_wins INTEGER NOT NULL,
+  total_driver_of_the_day INTEGER NOT NULL,
+  total_grand_slams INTEGER NOT NULL
 );
+
 CREATE TABLE constructor (
-  id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, full_name TEXT NOT NULL
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  total_championship_wins INTEGER NOT NULL,
+  total_race_wins INTEGER NOT NULL,
+  total_1_and_2_finishes INTEGER NOT NULL,
+  total_podiums INTEGER NOT NULL,
+  total_podium_races INTEGER NOT NULL,
+  total_points REAL NOT NULL,
+  total_pole_positions INTEGER NOT NULL,
+  total_fastest_laps INTEGER NOT NULL
 );
+
+CREATE TABLE season (
+  year INTEGER NOT NULL PRIMARY KEY
+);
+
+CREATE TABLE grand_prix (
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL
+);
+
+CREATE TABLE circuit (
+  id TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL,
+  place_name TEXT NOT NULL
+);
+
 CREATE TABLE race (
-  id INTEGER NOT NULL PRIMARY KEY, year INTEGER NOT NULL, round INTEGER NOT NULL,
-  date TEXT NOT NULL, grand_prix_id TEXT NOT NULL, official_name TEXT NOT NULL,
-  qualifying_format TEXT NOT NULL, circuit_id TEXT NOT NULL
+  id INTEGER NOT NULL PRIMARY KEY,
+  year INTEGER NOT NULL,
+  round INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  grand_prix_id TEXT NOT NULL,
+  official_name TEXT NOT NULL,
+  qualifying_format TEXT NOT NULL,
+  sprint_qualifying_format TEXT,
+  circuit_id TEXT NOT NULL
 );
--- Stub views: column set matches what qualifying_result / race_result actually expose in the
--- bundled DB (verified via sqlite3 .schema). Only the columns used in queries are listed;
--- the real views have additional columns that SQLDelight will ignore in the generated code.
--- CAST(NULL AS ...) on the optional columns makes SQLDelight generate them as nullable
--- (Long?/String?), matching the real data: modern quali has NULL time_millis (single combined
--- time is unused) and NULL q3_millis for drivers eliminated in Q1/Q2; DNFs have NULL position.
-CREATE VIEW qualifying_result AS
-  SELECT 0 AS race_id, 0 AS position_number, '' AS driver_id,
-         '' AS constructor_id, CAST(NULL AS INTEGER) AS time_millis,
-         CAST(NULL AS INTEGER) AS q1_millis, CAST(NULL AS INTEGER) AS q2_millis, CAST(NULL AS INTEGER) AS q3_millis;
-CREATE VIEW race_result AS
-  SELECT 0 AS race_id, CAST(NULL AS INTEGER) AS position_number, '' AS driver_id,
-         '' AS constructor_id, CAST(NULL AS TEXT) AS reason_retired;
+
+-- ---- Standings (final per-season + cumulative per-race snapshots) ---------
+CREATE TABLE season_driver_standing (
+  year INTEGER NOT NULL,
+  position_display_order INTEGER NOT NULL,
+  position_number INTEGER,
+  position_text TEXT NOT NULL,
+  driver_id TEXT NOT NULL,
+  points REAL NOT NULL,
+  championship_won INTEGER NOT NULL
+);
+
+CREATE TABLE season_constructor_standing (
+  year INTEGER NOT NULL,
+  position_display_order INTEGER NOT NULL,
+  position_number INTEGER,
+  position_text TEXT NOT NULL,
+  constructor_id TEXT NOT NULL,
+  points REAL NOT NULL,
+  championship_won INTEGER NOT NULL
+);
+
+CREATE TABLE race_driver_standing (
+  race_id INTEGER NOT NULL,
+  position_display_order INTEGER NOT NULL,
+  position_number INTEGER,
+  position_text TEXT NOT NULL,
+  driver_id TEXT NOT NULL,
+  points REAL NOT NULL
+);
+
+CREATE TABLE race_constructor_standing (
+  race_id INTEGER NOT NULL,
+  position_display_order INTEGER NOT NULL,
+  position_number INTEGER,
+  position_text TEXT NOT NULL,
+  constructor_id TEXT NOT NULL,
+  points REAL NOT NULL
+);
+
+-- ---- Seat/era labels (which rounds a driver actually held a seat) ---------
+CREATE TABLE season_entrant_driver (
+  year INTEGER NOT NULL,
+  constructor_id TEXT NOT NULL,
+  driver_id TEXT NOT NULL,
+  rounds TEXT
+);
+
+-- ---- Result VIEWS (stub SELECTs; literals encode nullability) ------------
+-- qualifying_result: the real view renames race_data's qualifying_* columns. time_millis is
+-- NULL for 2006+; q1/q2/q3_millis carry the real times. position_number NULL for DNS/DNQ.
+CREATE VIEW qualifying_result AS SELECT
+  0 AS race_id,
+  0 AS position_display_order,
+  CAST(NULL AS INTEGER) AS position_number,
+  '' AS position_text,
+  '' AS driver_id,
+  '' AS constructor_id,
+  CAST(NULL AS INTEGER) AS time_millis,
+  CAST(NULL AS INTEGER) AS q1_millis,
+  CAST(NULL AS INTEGER) AS q2_millis,
+  CAST(NULL AS INTEGER) AS q3_millis,
+  CAST(NULL AS TEXT) AS gap;
+
+CREATE VIEW race_result AS SELECT
+  0 AS race_id,
+  0 AS position_display_order,
+  CAST(NULL AS INTEGER) AS position_number,
+  '' AS position_text,
+  '' AS driver_id,
+  '' AS constructor_id,
+  0 AS shared_car,
+  CAST(NULL AS INTEGER) AS grid_position_number,
+  0.0 AS points,
+  CAST(NULL AS TEXT) AS time,
+  CAST(NULL AS TEXT) AS gap,
+  CAST(NULL AS INTEGER) AS laps,
+  CAST(NULL AS TEXT) AS reason_retired,
+  0 AS fastest_lap,
+  0 AS pole_position;
+
+CREATE VIEW sprint_race_result AS SELECT
+  0 AS race_id,
+  0 AS position_display_order,
+  '' AS position_text,
+  '' AS driver_id,
+  '' AS constructor_id,
+  0.0 AS points,
+  CAST(NULL AS TEXT) AS gap,
+  CAST(NULL AS TEXT) AS reason_retired;
+
+CREATE VIEW sprint_qualifying_result AS SELECT
+  0 AS race_id,
+  0 AS position_display_order,
+  '' AS position_text,
+  '' AS driver_id,
+  CAST(NULL AS INTEGER) AS time_millis,
+  CAST(NULL AS INTEGER) AS q1_millis,
+  CAST(NULL AS INTEGER) AS q2_millis,
+  CAST(NULL AS INTEGER) AS q3_millis;
+
+-- ============================================================================
+-- Hero queries (Phase 0 — Driver vs Car). Feature queries live in sibling .sq
+-- files (Browse.sq / HeadToHead.sq / Standings.sq / Records.sq) against this schema.
+-- ============================================================================
 
 selectSeasons:
 SELECT DISTINCT year FROM race ORDER BY year DESC;
 
 -- All qualifying rows for a season, joined to driver/constructor/race, for the teammate engine.
+-- best_millis is the COALESCE'd display time (FACT 2); the engine still consumes q1/q2/q3/time
+-- individually and coalesces internally, so best_millis is additive and display-only.
 qualifyingForSeason:
 SELECT q.race_id, r.round, r.official_name, q.driver_id, d.full_name AS driver_name,
        d.abbreviation, q.constructor_id, c.name AS constructor_name,
-       q.time_millis, q.q1_millis, q.q2_millis, q.q3_millis
+       q.time_millis, q.q1_millis, q.q2_millis, q.q3_millis,
+       COALESCE(q.q3_millis, q.q2_millis, q.q1_millis, q.time_millis) AS best_millis
 FROM qualifying_result q
 JOIN race r ON r.id = q.race_id
 JOIN driver d ON d.id = q.driver_id
 JOIN constructor c ON c.id = q.constructor_id
 WHERE r.year = :year
-ORDER BY r.round, q.constructor_id, q.position_number;
+ORDER BY r.round, q.constructor_id, q.position_display_order;
 
 -- Race results for a season (for a later DNF/car-fault classification companion).
 raceResultsForSeason:
