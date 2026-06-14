@@ -57,8 +57,11 @@ fun DriverVsCarScreen(vm: DriverVsCarViewModel = koinViewModel()) {
             }
         }
         Spacer(Modifier.height(8.dp))
+        val error = s.error
         if (s.loading) {
             CircularProgressIndicator()
+        } else if (error != null) {
+            Text(error, style = MaterialTheme.typography.bodyLarge)
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
                 items(s.rows) { (r, name) ->

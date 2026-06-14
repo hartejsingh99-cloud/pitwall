@@ -15,6 +15,7 @@ data class UiState(
     val selectedYear: Int? = null,
     val rows: List<Pair<DriverCarRating, String>> = emptyList(),
     val loading: Boolean = true,
+    val error: String? = null,
 )
 
 class DriverVsCarViewModel(private val repo: F1Repository) : ViewModel() {
@@ -26,12 +27,17 @@ class DriverVsCarViewModel(private val repo: F1Repository) : ViewModel() {
     fun load(year: Int?) {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true)
-            val (seasons, chosen, rows) = withContext(Dispatchers.Default) {
+            // The bundled dataset always has seasons, so this is a corrupt-DB guard, not a normal
+            // path. firstOrNull() keeps an empty result from throwing inside the coroutine scope
+            // (which would be swallowed, leaving the spinner up forever) and surfaces it instead.
+            val result = withContext(Dispatchers.Default) {
                 val s = repo.seasons()
-                val y = year ?: s.first()
+                val y = year ?: s.firstOrNull() ?: return@withContext null
                 Triple(s, y, repo.ratingsForSeason(y.toLong()))
             }
-            _state.value = UiState(seasons, chosen, rows, loading = false)
+            _state.value = result?.let { (seasons, chosen, rows) ->
+                UiState(seasons, chosen, rows, loading = false)
+            } ?: UiState(loading = false, error = "No seasons found in the bundled dataset.")
         }
     }
 }

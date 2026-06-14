@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Pure-Compose app: the framework only paints the window background before Compose's first
+      frame, so we don't need the Material Components library here — every real surface is Material3,
+      drawn by Compose. We name our own theme (rather than referencing a framework style inline) and
+      make the system bars transparent so Compose can draw edge-to-edge. The parent Theme.Material
+      has been available since API 21, so it's safe at our minSdk 24.
+    -->
+    <style name="Theme.PitWall" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>
