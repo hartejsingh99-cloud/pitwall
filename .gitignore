@@ -5,3 +5,8 @@ local.properties
 *.iml
 .kotlin/
 .superpowers/
+
+# Bundled f1db dataset (~70MB) — NOT committed (would bloat history ~70MB per release).
+# Present in the working tree for local builds; CI/release plan fetches it at build time
+# (scripts/fetch_f1db.sh + a checked-in f1db.version pin + sha256). See docs/superpowers/plans/2026-06-14-pitwall-ci-release.md
+composeApp/src/commonMain/composeResources/files/f1db.db

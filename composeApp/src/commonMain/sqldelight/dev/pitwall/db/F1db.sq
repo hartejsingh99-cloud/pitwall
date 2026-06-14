@@ -1,0 +1,48 @@
+-- Schema declarations matching the bundled f1db (subset) so SQLDelight can map result rows.
+-- Tables already exist in the bundled DB, so we NEVER call F1db.Schema.create().
+CREATE TABLE driver (
+  id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, full_name TEXT NOT NULL,
+  abbreviation TEXT NOT NULL, permanent_number TEXT, nationality_country_id TEXT NOT NULL
+);
+CREATE TABLE constructor (
+  id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, full_name TEXT NOT NULL
+);
+CREATE TABLE race (
+  id INTEGER NOT NULL PRIMARY KEY, year INTEGER NOT NULL, round INTEGER NOT NULL,
+  date TEXT NOT NULL, grand_prix_id TEXT NOT NULL, official_name TEXT NOT NULL,
+  qualifying_format TEXT NOT NULL, circuit_id TEXT NOT NULL
+);
+-- Stub views: column set matches what qualifying_result / race_result actually expose in the
+-- bundled DB (verified via sqlite3 .schema). Only the columns used in queries are listed;
+-- the real views have additional columns that SQLDelight will ignore in the generated code.
+-- CAST(NULL AS ...) on the optional columns makes SQLDelight generate them as nullable
+-- (Long?/String?), matching the real data: modern quali has NULL time_millis (single combined
+-- time is unused) and NULL q3_millis for drivers eliminated in Q1/Q2; DNFs have NULL position.
+CREATE VIEW qualifying_result AS
+  SELECT 0 AS race_id, 0 AS position_number, '' AS driver_id,
+         '' AS constructor_id, CAST(NULL AS INTEGER) AS time_millis,
+         CAST(NULL AS INTEGER) AS q1_millis, CAST(NULL AS INTEGER) AS q2_millis, CAST(NULL AS INTEGER) AS q3_millis;
+CREATE VIEW race_result AS
+  SELECT 0 AS race_id, CAST(NULL AS INTEGER) AS position_number, '' AS driver_id,
+         '' AS constructor_id, CAST(NULL AS TEXT) AS reason_retired;
+
+selectSeasons:
+SELECT DISTINCT year FROM race ORDER BY year DESC;
+
+-- All qualifying rows for a season, joined to driver/constructor/race, for the teammate engine.
+qualifyingForSeason:
+SELECT q.race_id, r.round, r.official_name, q.driver_id, d.full_name AS driver_name,
+       d.abbreviation, q.constructor_id, c.name AS constructor_name,
+       q.time_millis, q.q1_millis, q.q2_millis, q.q3_millis
+FROM qualifying_result q
+JOIN race r ON r.id = q.race_id
+JOIN driver d ON d.id = q.driver_id
+JOIN constructor c ON c.id = q.constructor_id
+WHERE r.year = :year
+ORDER BY r.round, q.constructor_id, q.position_number;
+
+-- Race results for a season (for a later DNF/car-fault classification companion).
+raceResultsForSeason:
+SELECT rr.race_id, r.round, rr.driver_id, rr.constructor_id, rr.position_number, rr.reason_retired
+FROM race_result rr JOIN race r ON r.id = rr.race_id
+WHERE r.year = :year;

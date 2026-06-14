@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.sqldelight)
 }
 
 kotlin {
@@ -23,17 +24,36 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(libs.compose.runtime)
-            implementation(libs.compose.foundation)
-            implementation(libs.compose.material3)
-            implementation(libs.compose.components.resources)
+            // compose.* accessors are plugin-managed (version = the Compose MP plugin, no drift).
+            // They emit a deprecation notice in CMP 1.11.1, but the "direct coordinate" form
+            // (org.jetbrains.compose.material3:material3:<v>) is not published — accessors are correct.
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.components.resources)
+            implementation(libs.sqldelight.coroutines)
         }
-
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
+        androidMain.dependencies {
+            implementation(libs.sqldelight.android)
+        }
         val desktopMain by getting {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.coroutines.swing)
+                implementation(libs.sqldelight.sqlite)
             }
+        }
+    }
+}
+
+sqldelight {
+    databases {
+        create("F1db") {
+            packageName.set("dev.pitwall.db")
+            verifyMigrations.set(false)
         }
     }
 }
