@@ -87,6 +87,11 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg)
+            // The packaged app ships a jlink-minimized JRE. jlink can't see the JDBC SQLite driver's
+            // runtime use of java.sql.DriverManager, so without this the module is stripped and the
+            // first DB query throws NoClassDefFoundError (java.sql.DriverManager) — fine under tests
+            // and `run` (full JDK), but a hang in the installed .app. Bundle java.sql explicitly.
+            modules("java.sql")
             packageName = "PitWall"
             // macOS/jpackage requires the major version to be >= 1; the app is conceptually 0.1.0
             // (see Android versionName + the git tag).
