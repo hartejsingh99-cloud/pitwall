@@ -55,6 +55,10 @@ WHERE rr.driver_id IN (:driverA, :driverB)
   )
 ORDER BY r.year, rr.race_id;
 
+-- Display name for a constructor slug (teammate-stint label shows the name, not the id).
+constructorNames:
+SELECT id, name FROM constructor;
+
 -- Seat/era rows for either driver at any constructor they ever shared (supplementary context).
 sharedSeats:
 SELECT year, constructor_id, driver_id, rounds

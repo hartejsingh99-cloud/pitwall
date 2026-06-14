@@ -5,6 +5,7 @@ import dev.pitwall.domain.H2HQualiRow
 import dev.pitwall.domain.H2HRaceRow
 import dev.pitwall.domain.HeadToHeadResult
 import dev.pitwall.domain.computeHeadToHead
+import dev.pitwall.domain.withConstructorNames
 
 /** A driver option in the picker. */
 data class DriverPick(
@@ -82,6 +83,9 @@ class HeadToHeadRepository(private val db: F1db) {
             )
         }
         val result = computeHeadToHead(quali, races, driverA, driverB)
-        return HeadToHeadData(a, b, result)
+        // Surface constructor display names (not slugs) in the teammate-stint labels.
+        val names = db.headToHeadQueries.constructorNames().executeAsList()
+            .associate { it.id to it.name }
+        return HeadToHeadData(a, b, result.withConstructorNames(names))
     }
 }

@@ -100,10 +100,11 @@ class TitleRepository(private val db: F1db) {
         val maxAvailable = maxRemaining(remainingGps, remainingSprints, sys, isConstructor)
 
         val pointsById = raw.associate { it.id to it.points }
+        val nameById = raw.associate { it.id to it.name }
         val statuses = if (strict) titleAliveStrict(pointsById, maxAvailable)
                        else titleAliveSimple(pointsById, maxAvailable)
         val leaderPoints = raw.maxOf { it.points }
-        val clinch = clinchScenario(pointsById, maxAvailable)
+        val clinch = clinchScenario(pointsById, maxAvailable, nameById)
 
         val rows = raw.map {
             TitleRow(

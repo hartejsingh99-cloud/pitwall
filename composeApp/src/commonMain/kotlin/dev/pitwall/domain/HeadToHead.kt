@@ -42,7 +42,21 @@ data class TeammateStint(
     val sessions: Int,
     val aAhead: Int,
     val medianGapPctA: Double,   // positive = A faster than B over the stint
+    /**
+     * Constructor display name for the stint label. The pure engine only knows the slug
+     * [constructorId], so it defaults the name to the slug; the repo (which has the DB)
+     * fills in the real name via [withConstructorNames].
+     */
+    val constructorName: String = constructorId,
 )
+
+/** Replace each stint's [TeammateStint.constructorName] using a slug -> display-name map. */
+fun HeadToHeadResult.withConstructorNames(names: Map<String, String>): HeadToHeadResult =
+    copy(
+        teammateStints = teammateStints.map { st ->
+            st.copy(constructorName = names[st.constructorId] ?: st.constructorId)
+        },
+    )
 
 data class HeadToHeadResult(
     val career: CareerH2H,

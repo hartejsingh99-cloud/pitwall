@@ -96,7 +96,12 @@ fun RaceResultScreen(
         }
 
         val tabs = sessions.available.tabs
-        var selected by remember(tabs) { mutableStateOf(0) }
+        // FIX 13 (verified false positive): remember keys use STRUCTURAL equality, and Kotlin
+        // List.equals compares by content — a same-content `tabs` list does NOT reset selection
+        // across recompositions. Keying on a stable identity string of which tabs exist is
+        // behavior-identical to keying on `tabs`, just clearer about intent.
+        val tabsKey = tabs.joinToString(",") { it.name }
+        var selected by remember(tabsKey) { mutableStateOf(0) }
         val current = tabs.getOrElse(selected) { tabs.first() }
 
         TabRow(selectedTabIndex = selected) {
@@ -149,10 +154,14 @@ private fun QualifyingTable(rows: List<QualifyingResultRow>) {
                 PosCell(r.positionText)
                 Column(Modifier.weight(1f)) {
                     Text(r.driverName, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Q1 ${millisToLapTime(r.q1Millis)} · Q2 ${millisToLapTime(r.q2Millis)} · Q3 ${millisToLapTime(r.q3Millis)}",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    // Pre-2006 single-session quali has q1/q2/q3 all NULL (time only in bestMillis);
+                    // only show the per-session breakdown when at least one session time exists.
+                    if (r.q1Millis != null || r.q2Millis != null || r.q3Millis != null) {
+                        Text(
+                            "Q1 ${millisToLapTime(r.q1Millis)} · Q2 ${millisToLapTime(r.q2Millis)} · Q3 ${millisToLapTime(r.q3Millis)}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
                 Text(millisToLapTime(r.bestMillis), fontWeight = FontWeight.SemiBold)
             }
@@ -194,10 +203,13 @@ private fun SprintQualifyingTable(rows: List<SprintQualifyingResultRow>) {
                 PosCell(r.positionText)
                 Column(Modifier.weight(1f)) {
                     Text(r.driverName, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Q1 ${millisToLapTime(r.q1Millis)} · Q2 ${millisToLapTime(r.q2Millis)} · Q3 ${millisToLapTime(r.q3Millis)}",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    // Same single-session guard as QualifyingTable (FIX 11).
+                    if (r.q1Millis != null || r.q2Millis != null || r.q3Millis != null) {
+                        Text(
+                            "Q1 ${millisToLapTime(r.q1Millis)} · Q2 ${millisToLapTime(r.q2Millis)} · Q3 ${millisToLapTime(r.q3Millis)}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
                 Text(millisToLapTime(r.bestMillis), fontWeight = FontWeight.SemiBold)
             }

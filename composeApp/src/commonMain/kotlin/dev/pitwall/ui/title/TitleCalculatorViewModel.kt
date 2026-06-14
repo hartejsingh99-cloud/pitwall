@@ -4,9 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.pitwall.data.TitleRepository
 import dev.pitwall.data.TitleState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -30,21 +33,36 @@ class TitleCalculatorViewModel(private val repo: TitleRepository) : ViewModel() 
     fun setConstructor(isConstructor: Boolean) { _state.value = _state.value.copy(isConstructor = isConstructor); reload() }
     fun setStrict(strict: Boolean) { _state.value = _state.value.copy(strict = strict); reload() }
 
+    private var loadJob: Job? = null
+
     private fun reload() {
+        // Snapshot the toggles we need to drive THIS load. We must not write cur.copy(...) back at
+        // the end: a toggle changed while the coroutine was in flight would be clobbered. Read the
+        // LATEST state via _state.update {} when writing results instead.
         val cur = _state.value
-        viewModelScope.launch {
-            _state.value = cur.copy(loading = true, error = null)
-            // The bundled dataset always has seasons; firstOrNull guards a corrupt DB so the spinner
-            // can't hang forever (an exception inside the launch would be swallowed).
-            val result = withContext(Dispatchers.Default) {
-                val seasons = repo.seasons()
-                val year = cur.selectedYear ?: seasons.firstOrNull() ?: return@withContext null
-                val title = repo.titleState(year, cur.isConstructor, cur.strict)
-                Triple(seasons, year, title)
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            _state.update { it.copy(loading = true, error = null) }
+            try {
+                // The bundled dataset always has seasons; firstOrNull guards a corrupt DB so the spinner
+                // can't hang forever.
+                val result = withContext(Dispatchers.Default) {
+                    val seasons = repo.seasons()
+                    val year = cur.selectedYear ?: seasons.firstOrNull() ?: return@withContext null
+                    val title = repo.titleState(year, cur.isConstructor, cur.strict)
+                    Triple(seasons, year, title)
+                }
+                if (result != null) {
+                    val (seasons, year, title) = result
+                    _state.update { it.copy(seasons = seasons, selectedYear = year, state = title, loading = false, error = null) }
+                } else {
+                    _state.update { it.copy(loading = false, error = "No seasons found in the bundled dataset.") }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, error = e.message ?: "Failed to load title picture.") }
             }
-            _state.value = result?.let { (seasons, year, title) ->
-                cur.copy(seasons = seasons, selectedYear = year, state = title, loading = false, error = null)
-            } ?: cur.copy(loading = false, error = "No seasons found in the bundled dataset.")
         }
     }
 }

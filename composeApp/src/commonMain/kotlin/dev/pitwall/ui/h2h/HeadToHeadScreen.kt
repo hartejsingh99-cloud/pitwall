@@ -138,7 +138,7 @@ fun HeadToHeadScreen(vm: HeadToHeadViewModel = koinViewModel()) {
                             ListItem(
                                 headlineContent = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("${st.year} · ${st.constructorId}", fontWeight = FontWeight.SemiBold)
+                                        Text("${st.year} · ${st.constructorName}", fontWeight = FontWeight.SemiBold)
                                         Spacer(Modifier.width(8.dp))
                                         AssistChip(onClick = {}, label = { Text("same car") })
                                     }

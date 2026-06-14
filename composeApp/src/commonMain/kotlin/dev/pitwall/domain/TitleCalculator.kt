@@ -104,15 +104,20 @@ fun titleAliveStrict(points: Map<String, Double>, remaining: Int): Map<String, T
  * Clinched iff the leader's margin over P2 is strictly greater than the points still available
  * (a margin exactly equal to remaining leaves P2 a tie scenario, so it is NOT a clinch).
  * Returns null when there is no second contender or no points are at stake.
+ *
+ * [points] is keyed by raw entity id (the DB slug); [nameById] maps that id to the human-readable
+ * display name so the message reads "Andrea Kimi Antonelli has clinched..." rather than the slug.
+ * Falls back to the id if a name is missing.
  */
-fun clinchScenario(points: Map<String, Double>, remaining: Int): String? {
+fun clinchScenario(points: Map<String, Double>, remaining: Int, nameById: Map<String, String>): String? {
     if (points.size < 2) return null
     val sorted = points.entries.sortedByDescending { it.value }
     val leader = sorted[0]
     val second = sorted[1]
     val margin = leader.value - second.value
     if (margin <= remaining) return null
-    return "${leader.key} has clinched the title — lead of ${formatPoints(margin)} exceeds the ${remaining} points still available."
+    val leaderName = nameById[leader.key] ?: leader.key
+    return "$leaderName has clinched the title — lead of ${formatPoints(margin)} exceeds the ${remaining} points still available."
 }
 
 /** Points as a compact string: drop a trailing ".0", keep one decimal otherwise. No String.format. */

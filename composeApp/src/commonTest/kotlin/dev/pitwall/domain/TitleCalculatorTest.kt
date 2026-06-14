@@ -2,6 +2,7 @@ package dev.pitwall.domain
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -170,25 +171,40 @@ class TitleCalculatorTest {
 
     @Test fun clinch_whenLeadExceedsRemaining() {
         // lead 200, P2 100 -> lead margin 100 > remaining 50 -> clinched.
-        val msg = clinchScenario(mapOf("lead" to 200.0, "p2" to 100.0), remaining = 50)
+        // Keys are DB slugs; the message must interpolate the DISPLAY NAME, not the slug.
+        val pts = mapOf("andrea-kimi-antonelli" to 200.0, "lewis-hamilton" to 100.0)
+        val names = mapOf("andrea-kimi-antonelli" to "Andrea Kimi Antonelli", "lewis-hamilton" to "Lewis Hamilton")
+        val msg = clinchScenario(pts, remaining = 50, nameById = names)
         assertNotNull(msg)
-        assertTrue(msg.contains("lead", ignoreCase = true) || msg.contains("clinch", ignoreCase = true))
+        assertTrue(msg.contains("clinch", ignoreCase = true))
+        // The leader's display name appears; the raw slug does NOT.
+        assertTrue(msg.contains("Andrea Kimi Antonelli"))
+        assertFalse(msg.contains("andrea-kimi-antonelli"))
+    }
+
+    @Test fun clinch_fallsBackToIdWhenNameMissing() {
+        // No display name supplied for the leader -> fall back to the id rather than crash.
+        val msg = clinchScenario(mapOf("lead" to 200.0, "p2" to 100.0), remaining = 50, nameById = emptyMap())
+        assertNotNull(msg)
+        assertTrue(msg.contains("lead"))
     }
 
     @Test fun clinch_notYetWhenLeadEqualsRemaining() {
         // margin 50 == remaining 50 -> NOT strictly greater -> not clinched (P2 could still tie).
-        assertNull(clinchScenario(mapOf("lead" to 150.0, "p2" to 100.0), remaining = 50))
+        val names = mapOf("lead" to "Leader", "p2" to "Runner Up")
+        assertNull(clinchScenario(mapOf("lead" to 150.0, "p2" to 100.0), remaining = 50, nameById = names))
     }
 
     @Test fun clinch_notWhenTitleStillOpen_2026Monaco() {
         // Antonelli leads Hamilton by 66 with +424 available -> wide open, no clinch.
         val pts = mapOf("antonelli" to 156.0, "hamilton" to 90.0)
-        assertNull(clinchScenario(pts, remaining = 424))
+        val names = mapOf("antonelli" to "Andrea Kimi Antonelli", "hamilton" to "Lewis Hamilton")
+        assertNull(clinchScenario(pts, remaining = 424, nameById = names))
     }
 
     @Test fun clinch_handlesEmptyOrSingle() {
-        assertNull(clinchScenario(emptyMap(), 100))
+        assertNull(clinchScenario(emptyMap(), 100, nameById = emptyMap()))
         // single entrant with rounds left: no P2 to compare; treat as not-yet-clinched (season not over).
-        assertNull(clinchScenario(mapOf("solo" to 10.0), 100))
+        assertNull(clinchScenario(mapOf("solo" to 10.0), 100, nameById = mapOf("solo" to "Solo")))
     }
 }

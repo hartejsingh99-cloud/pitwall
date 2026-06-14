@@ -75,10 +75,7 @@ data class OnThisDayEntry(
     val place: String,
     val winner: String,
     val constructor: String,
-) {
-    /** "On this day in 2010: Lewis Hamilton won the Turkey GP at Istanbul Park." */
-    val sentence: String get() = "On this day in $year: $winner won the $grandPrix GP at $circuit."
-}
+)
 
 /** A [RecordRow] with its 1-based position in the ranked list. */
 data class RankedRecord(val rank: Int, val row: RecordRow)

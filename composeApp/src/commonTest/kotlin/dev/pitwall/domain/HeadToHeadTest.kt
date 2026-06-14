@@ -50,6 +50,8 @@ class HeadToHeadTest {
         val s2014 = res.teammateStints.first { it.year == 2014 }
         val s2015 = res.teammateStints.first { it.year == 2015 }
         assertEquals("merc", s2014.constructorId)
+        // The pure engine has no DB, so constructorName defaults to the slug until the repo maps it.
+        assertEquals("merc", s2014.constructorName)
         assertEquals(2, s2014.sessions)
         assertEquals(2, s2014.aAhead)
         assertTrue(s2014.medianGapPctA > 0)              // a faster -> positive for a
@@ -61,6 +63,23 @@ class HeadToHeadTest {
         val resB = computeHeadToHead(quali, emptyList(), "b", "a")
         val s2014b = resB.teammateStints.first { it.year == 2014 }
         assertEquals(s2014.medianGapPctA, -s2014b.medianGapPctA, 1e-9)
+    }
+
+    // --- Constructor display names: repo-side mapping replaces slug, falls back to slug if absent. ---
+    @Test fun withConstructorNamesMapsSlugToDisplayNameWithFallback() {
+        val quali = listOf(
+            ql(1, 2014, "a", "merc", 90_000), ql(1, 2014, "b", "merc", 90_450),
+            ql(3, 2015, "a", "unknown_slug", 91_000), ql(3, 2015, "b", "unknown_slug", 91_300),
+        )
+        val res = computeHeadToHead(quali, emptyList(), "a", "b")
+        val named = res.withConstructorNames(mapOf("merc" to "Mercedes"))
+
+        val s2014 = named.teammateStints.first { it.year == 2014 }
+        assertEquals("merc", s2014.constructorId)         // key/slug unchanged
+        assertEquals("Mercedes", s2014.constructorName)   // display name applied
+
+        val s2015 = named.teammateStints.first { it.year == 2015 }
+        assertEquals("unknown_slug", s2015.constructorName) // no mapping -> falls back to slug
     }
 
     // --- Never teammates: empty stints, directGapComputable=false, but career totals still computed. ---

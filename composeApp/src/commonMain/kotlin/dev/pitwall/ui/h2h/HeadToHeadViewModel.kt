@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.pitwall.data.DriverPick
 import dev.pitwall.data.HeadToHeadData
 import dev.pitwall.data.HeadToHeadRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,10 +58,21 @@ class HeadToHeadViewModel(private val repo: HeadToHeadRepository) : ViewModel() 
             _state.value = _state.value.copy(data = null)
             return
         }
+        // Capture the pair this compute is for; only the latest selection may write back.
+        val expectedA = a.id
+        val expectedB = b.id
         viewModelScope.launch {
             _state.value = _state.value.copy(computing = true)
-            val data = withContext(Dispatchers.Default) { repo.headToHead(a.id, b.id) }
-            _state.value = _state.value.copy(data = data, computing = false)
+            val data = try {
+                withContext(Dispatchers.Default) { repo.headToHead(expectedA, expectedB) }
+            } catch (e: CancellationException) {
+                throw e
+            }
+            // Drop the result if the user has since swapped/re-picked: latest selection wins.
+            val cur = _state.value
+            if (cur.pickA?.id == expectedA && cur.pickB?.id == expectedB) {
+                _state.value = cur.copy(data = data, computing = false)
+            }
         }
     }
 

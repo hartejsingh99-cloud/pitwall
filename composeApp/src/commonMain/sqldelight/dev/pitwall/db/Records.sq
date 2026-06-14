@@ -148,4 +148,5 @@ JOIN race_result rr ON rr.race_id = r.id AND rr.position_number = 1
 JOIN driver d ON d.id = rr.driver_id
 JOIN constructor c ON c.id = rr.constructor_id
 WHERE strftime('%m-%d', r.date) = :mmdd
+  AND rr.driver_id = (SELECT MIN(rr2.driver_id) FROM race_result rr2 WHERE rr2.race_id = r.id AND rr2.position_number = 1)
 ORDER BY r.year DESC;

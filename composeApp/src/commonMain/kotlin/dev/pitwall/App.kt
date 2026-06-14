@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
@@ -141,12 +142,15 @@ private fun BrowseHost() {
 }
 
 @Composable
-private fun rememberEntryOwner(key: Any): ViewModelStoreOwner =
-    remember(key) {
+private fun rememberEntryOwner(key: Any): ViewModelStoreOwner {
+    val owner = remember(key) {
         object : ViewModelStoreOwner {
             override val viewModelStore = ViewModelStore()
         }
     }
+    DisposableEffect(key) { onDispose { owner.viewModelStore.clear() } }
+    return owner
+}
 
 // ---- Records hosts the leaderboards + On-This-Day under one destination ----
 @Composable

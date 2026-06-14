@@ -143,8 +143,14 @@ class BrowseRepository(private val db: F1db) {
         )
     }
 
-    fun driverStandings(year: Long): List<StandingRow> =
-        q.seasonDriverStanding(year).executeAsList().map {
+    /**
+     * Final driver standings for [year]. season_driver_standing only holds FINAL standings, so for an
+     * in-progress season it is empty. In that case fall back to the LIVE snapshot (cumulative standings
+     * after the latest run round) so the UI shows a live table instead of "No standings yet". The live
+     * snapshot carries no champion flag, so championshipWon is false for those rows.
+     */
+    fun driverStandings(year: Long): List<StandingRow> {
+        val final = q.seasonDriverStanding(year).executeAsList().map {
             StandingRow(
                 positionText = it.position_text,
                 name = it.driver_name,
@@ -152,9 +158,19 @@ class BrowseRepository(private val db: F1db) {
                 championshipWon = it.championship_won == 1L,
             )
         }
+        if (final.isNotEmpty()) return final
+        return db.standingsQueries.currentDriverStandings(year).executeAsList().map {
+            StandingRow(
+                positionText = it.position_text,
+                name = it.full_name,
+                points = it.points,
+                championshipWon = false,   // live snapshot has no champion flag
+            )
+        }
+    }
 
-    fun constructorStandings(year: Long): List<StandingRow> =
-        q.seasonConstructorStanding(year).executeAsList().map {
+    fun constructorStandings(year: Long): List<StandingRow> {
+        val final = q.seasonConstructorStanding(year).executeAsList().map {
             StandingRow(
                 positionText = it.position_text,
                 name = it.constructor_name,
@@ -162,4 +178,14 @@ class BrowseRepository(private val db: F1db) {
                 championshipWon = it.championship_won == 1L,
             )
         }
+        if (final.isNotEmpty()) return final
+        return db.standingsQueries.currentConstructorStandings(year).executeAsList().map {
+            StandingRow(
+                positionText = it.position_text,
+                name = it.name,
+                points = it.points,
+                championshipWon = false,   // live snapshot has no champion flag
+            )
+        }
+    }
 }

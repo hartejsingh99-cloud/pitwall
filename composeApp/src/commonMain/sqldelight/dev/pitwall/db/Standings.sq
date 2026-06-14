@@ -40,7 +40,9 @@ WHERE rcs.race_id = (
 ORDER BY rcs.position_display_order;
 
 -- Two scalar subselects: GPs not yet run, and sprint-format GPs not yet run.
--- A race is "run" iff it has race_result rows. remaining_sprints additionally requires a
+-- A GP is "run" iff it has race_result rows. A SPRINT is "run" iff it has sprint_race_result rows
+-- (the Saturday sprint can be done while the Sunday GP is still pending, so the sprint must be
+-- counted against sprint_race_result, NOT race_result). remaining_sprints additionally requires a
 -- non-null sprint_qualifying_format (the column that marks a sprint weekend in this dataset).
 remainingRounds:
 SELECT
@@ -50,7 +52,7 @@ SELECT
   (SELECT COUNT(*) FROM race r
      WHERE r.year = :year
        AND r.sprint_qualifying_format IS NOT NULL
-       AND r.id NOT IN (SELECT DISTINCT race_id FROM race_result)) AS remaining_sprints;
+       AND r.id NOT IN (SELECT DISTINCT race_id FROM sprint_race_result)) AS remaining_sprints;
 
 -- Round number + GP name of the latest run round in :year (deepest round with driver-standing
 -- rows). Drives a DYNAMIC freshness stamp ("data through {year} R{round} ({gp})") so a non-2026
