@@ -82,8 +82,11 @@ SELECT driver_id, driver_label, median_pace_ms, pace_pct_vs_team, deg_ms_per_lap
 FROM driver_pace WHERE session_id = ?
 ORDER BY median_pace_ms ASC;
 
+-- Season race-pace companion: one row PER DRIVER (averaged across the year's races). Without GROUP BY a
+-- multi-round season returns N rows per driver and the caller's .associate would keep an arbitrary one.
 heroRacePace:
-SELECT dp.driver_id, dp.pace_pct_vs_team
+SELECT dp.driver_id, AVG(dp.pace_pct_vs_team) AS pace_pct_vs_team
 FROM driver_pace dp
 JOIN session s ON s.id = dp.session_id
-WHERE s.year = ? AND s.session_type = 'R' AND dp.pace_pct_vs_team IS NOT NULL;
+WHERE s.year = ? AND s.session_type = 'R' AND dp.pace_pct_vs_team IS NOT NULL
+GROUP BY dp.driver_id;

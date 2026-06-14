@@ -2,6 +2,7 @@ import unittest
 
 from pitwall_bake.transform import (
     decimate_by_distance,
+    is_green_lap,
     pack_channels,
     symmetric_pace_pct,
     tyre_deg_slope,
@@ -56,6 +57,14 @@ class TransformTest(unittest.TestCase):
     def test_tyre_deg_slope_zero_when_insufficient(self):
         self.assertEqual(tyre_deg_slope([1], [90000]), 0.0)
         self.assertEqual(tyre_deg_slope([], []), 0.0)
+
+    def test_is_green_lap(self):
+        self.assertTrue(is_green_lap("1"))       # green throughout
+        self.assertTrue(is_green_lap("11"))      # repeated green code
+        self.assertFalse(is_green_lap(""))       # unknown -> NOT green
+        self.assertFalse(is_green_lap(None))     # missing -> NOT green
+        self.assertFalse(is_green_lap("12"))     # a yellow occurred
+        self.assertFalse(is_green_lap("4"))      # SC
 
 
 if __name__ == "__main__":

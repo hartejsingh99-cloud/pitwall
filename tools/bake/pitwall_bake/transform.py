@@ -83,6 +83,19 @@ def symmetric_pace_pct(ms_i: Optional[int], ms_j: Optional[int]) -> Optional[flo
     return 100.0 * (ms_i - ms_j) / ((ms_i + ms_j) / 2.0)
 
 
+def is_green_lap(track_status: Optional[str]) -> bool:
+    """True iff a lap ran ENTIRELY under green flag.
+
+    FastF1 concatenates every track-status code seen during the lap, so "1" (or "11") means green
+    throughout, "12"/"4"/"6" mean a yellow/SC/VSC occurred, and "" / None means the status was not
+    recorded. Unknown status is NOT green — treating "" as green silently admits SC/VSC laps into the
+    race-pace and tyre-deg fits. The conservative, correct filter is "all codes are green".
+    """
+    if not track_status:
+        return False
+    return set(track_status) == {"1"}
+
+
 def tyre_deg_slope(tyre_life: Sequence[int], lap_ms: Sequence[int]) -> float:
     """Least-squares slope (ms per lap of tyre life) of lap time vs tyre life. 0.0 if < 2 points.
 

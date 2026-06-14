@@ -16,16 +16,24 @@ import statistics
 from typing import Any, Dict, List
 
 from pitwall_bake.extract import enable_cache, load_session
-from pitwall_bake.transform import decimate_by_distance, pack_channels, symmetric_pace_pct, tyre_deg_slope
+from pitwall_bake.transform import decimate_by_distance, is_green_lap, pack_channels, symmetric_pace_pct, tyre_deg_slope
 from pitwall_bake.write_db import write_telemetry_db
 
 RACE_TYPES = {"R", "S"}  # race + sprint carry race-pace meaning
-GREEN = "1"  # FastF1 TrackStatus '1' == green flag
 
 
-def _pack_channel_row(raw: Dict[str, Any], step_m: float) -> Dict[str, Any]:
-    chans = {k: raw.get(k) for k in ("speed", "throttle", "brake", "gear", "drs", "x", "y")}
+def _pack_channel_row(raw: Dict[str, Any], step_m: float):
+    """Pack one lap's channels, or return None (with a warning) if it has no usable distance axis.
+
+    A telemetry frame with rows but no Distance column would otherwise pack distance="" -> stored as
+    valid NOT NULL TEXT -> the Kotlin side parses it to an empty list, ChannelSet.validated() throws,
+    and the lap silently vanishes from the UI. Skip + warn at bake time instead of corrupting the DB.
+    """
     dist = raw.get("distance") or []
+    if len(dist) < 2:
+        print(f"  warn: skip {raw.get('driver_id')} #{raw.get('lap_number')}: no distance telemetry")
+        return None
+    chans = {k: raw.get(k) for k in ("speed", "throttle", "brake", "gear", "drs", "x", "y")}
     d2, c2 = decimate_by_distance(dist, chans, step_m=step_m)
     return {
         "driver_id": raw["driver_id"], "lap_number": raw["lap_number"],
@@ -37,7 +45,9 @@ def _pack_channel_row(raw: Dict[str, Any], step_m: float) -> Dict[str, Any]:
 
 
 def _green_accurate(lap: Dict[str, Any]) -> bool:
-    return bool(lap.get("is_accurate")) and lap.get("lap_time_ms") and lap.get("track_status", "") in (GREEN, "")
+    # accurate + has a time + ran ENTIRELY green. Unknown/SC/VSC status is excluded (is_green_lap),
+    # so safety-car laps don't contaminate the median pace / tyre-deg fit.
+    return bool(lap.get("is_accurate")) and bool(lap.get("lap_time_ms")) and is_green_lap(lap.get("track_status"))
 
 
 def _build_pace(laps: List[Dict[str, Any]], drivers: Dict[str, Dict[str, str]]) -> List[Dict[str, Any]]:
@@ -84,7 +94,7 @@ def bake_one(out: str, year: int, rnd: int, stype: str, step_m: float, baked_at:
         {**l, "driver_label": labels.get(l["driver_id"], l["driver_id"])}
         for l in extracted["laps"]
     ]
-    channels = [_pack_channel_row(r, step_m) for r in extracted["raw_channels"]]
+    channels = [c for c in (_pack_channel_row(r, step_m) for r in extracted["raw_channels"]) if c is not None]
     pace = _build_pace(extracted["laps"], drivers) if stype in RACE_TYPES else []
 
     payload = {

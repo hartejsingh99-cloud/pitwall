@@ -102,11 +102,16 @@ fun DeltaCanvas(delta: List<Double>, modifier: Modifier = Modifier) {
             val (px, py) = scaleToCanvas(xsForScale, ys, size.width.toDouble(), size.height.toDouble(), pad = 4.0)
             val zeroY = py.last().toFloat()  // the appended 0.0 sample
             drawLine(baseline, Offset(0f, zeroY), Offset(size.width, zeroY), strokeWidth = 1f)
-            val path = Path().apply {
-                moveTo(px[0].toFloat(), py[0].toFloat())
-                for (i in 1 until delta.size) lineTo(px[i].toFloat(), py[i].toFloat())
+            // Color each segment by its own sign so the trace honestly shows where the comparison was
+            // ahead (green, below the baseline) vs behind (red), matching what the zero baseline implies.
+            for (i in 1 until delta.size) {
+                drawLine(
+                    color = if (delta[i] >= 0.0) behind else ahead,
+                    start = Offset(px[i - 1].toFloat(), py[i - 1].toFloat()),
+                    end = Offset(px[i].toFloat(), py[i].toFloat()),
+                    strokeWidth = 2f,
+                )
             }
-            drawPath(path, if ((delta.lastOrNull() ?: 0.0) >= 0.0) behind else ahead, style = Stroke(width = 2f))
         }
     }
 }
