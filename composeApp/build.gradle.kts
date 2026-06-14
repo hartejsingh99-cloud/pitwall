@@ -31,7 +31,12 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.components.resources)
+            implementation(libs.coroutines.core)
             implementation(libs.sqldelight.coroutines)
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
+            implementation(libs.lifecycle.viewmodel.compose)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -60,12 +65,12 @@ sqldelight {
 
 android {
     namespace = "dev.pitwall"
-    compileSdk = 35
+    compileSdk = libs.versions.androidCompileSdk.get().toInt()
 
     defaultConfig {
         applicationId = "dev.pitwall"
-        minSdk = 24
-        targetSdk = 35
+        minSdk = libs.versions.androidMinSdk.get().toInt()
+        targetSdk = libs.versions.androidCompileSdk.get().toInt()
         versionCode = 1
         versionName = "0.1.0"
     }

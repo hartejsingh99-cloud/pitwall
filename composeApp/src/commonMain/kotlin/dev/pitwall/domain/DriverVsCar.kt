@@ -1,6 +1,10 @@
 package dev.pitwall.domain
 
-/** Symmetric percent gap: 100*(ti-tj)/((ti+tj)/2). Negative when i is faster. */
+/**
+ * Symmetric percent gap: 100*(ti-tj)/((ti+tj)/2). Negative when i is faster.
+ * Precondition: ti > 0 && tj > 0 — callers pass times already validated by [lastCommonSegment];
+ * passing 0 for both yields NaN.
+ */
 fun symmetricGapPct(ti: Long, tj: Long): Double =
     100.0 * (ti - tj) / ((ti + tj) / 2.0)
 
