@@ -1,0 +1,66 @@
+-- ============================================================================
+-- Feature C — Title-Permutation Calculator queries.
+-- Labelled SELECTs against the shared schema in F1db.sq. No CREATE statements here
+-- (they live in F1db.sq; redeclaring would be a duplicate-table error). These methods
+-- hang off the same db.f1dbQueries.* accessor as every other .sq in this database.
+--
+-- "Current" standings = the cumulative race_*_standing snapshot after the LATEST race in
+-- the season that actually has standing rows. A race is "run" iff it has race_result rows;
+-- standings are written alongside, so the deepest round with standing rows is the latest run
+-- round (2026 -> R6 Monaco). We pick it by max round (position_display_order is always set).
+-- ============================================================================
+
+-- Driver standings after the latest run round of :year. position_text is verbatim status,
+-- ordered by position_display_order (NEVER position_number, which is NULL for DNF/etc.).
+currentDriverStandings:
+SELECT rds.position_display_order, rds.position_text, rds.driver_id, d.full_name, rds.points
+FROM race_driver_standing rds
+JOIN driver d ON d.id = rds.driver_id
+WHERE rds.race_id = (
+  SELECT r.id FROM race r
+  WHERE r.year = :year
+    AND r.id IN (SELECT DISTINCT race_id FROM race_driver_standing)
+  ORDER BY r.round DESC
+  LIMIT 1
+)
+ORDER BY rds.position_display_order;
+
+-- Constructor standings, same shape/shape-of-subselect on race_constructor_standing + constructor.
+currentConstructorStandings:
+SELECT rcs.position_display_order, rcs.position_text, rcs.constructor_id, c.name, rcs.points
+FROM race_constructor_standing rcs
+JOIN constructor c ON c.id = rcs.constructor_id
+WHERE rcs.race_id = (
+  SELECT r.id FROM race r
+  WHERE r.year = :year
+    AND r.id IN (SELECT DISTINCT race_id FROM race_constructor_standing)
+  ORDER BY r.round DESC
+  LIMIT 1
+)
+ORDER BY rcs.position_display_order;
+
+-- Two scalar subselects: GPs not yet run, and sprint-format GPs not yet run.
+-- A race is "run" iff it has race_result rows. remaining_sprints additionally requires a
+-- non-null sprint_qualifying_format (the column that marks a sprint weekend in this dataset).
+remainingRounds:
+SELECT
+  (SELECT COUNT(*) FROM race r
+     WHERE r.year = :year
+       AND r.id NOT IN (SELECT DISTINCT race_id FROM race_result)) AS remaining_gps,
+  (SELECT COUNT(*) FROM race r
+     WHERE r.year = :year
+       AND r.sprint_qualifying_format IS NOT NULL
+       AND r.id NOT IN (SELECT DISTINCT race_id FROM race_result)) AS remaining_sprints;
+
+-- Round number + GP name of the latest run round in :year (deepest round with driver-standing
+-- rows). Drives a DYNAMIC freshness stamp ("data through {year} R{round} ({gp})") so a non-2026
+-- or completed season shows its own real cutoff instead of a hardcoded literal. position_display_order
+-- not needed here; we pick by max round. Returns a single row (or none for a season with no standings).
+latestRunRoundLabel:
+SELECT r.round, gp.name AS gp_name
+FROM race r
+JOIN grand_prix gp ON gp.id = r.grand_prix_id
+WHERE r.year = :year
+  AND r.id IN (SELECT DISTINCT race_id FROM race_driver_standing)
+ORDER BY r.round DESC
+LIMIT 1;

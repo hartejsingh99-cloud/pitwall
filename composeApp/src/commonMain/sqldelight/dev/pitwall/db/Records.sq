@@ -1,0 +1,151 @@
+-- ============================================================================
+-- Feature D — Records Book + On-This-Day. Labelled SELECTs only; the schema lives
+-- in F1db.sq (do NOT re-declare any CREATE). Every query hangs off db.f1dbQueries.
+--
+-- Two families:
+--   1. Precomputed all-time leaderboards — read driver/constructor.total_* columns directly.
+--      Cheap (one indexed scan) and exactly matches the dataset's own published totals
+--      (verified: Hamilton 105 wins / 104 poles / 205 podiums / 68 FL).
+--   2. Era-sliced computed leaderboards — aggregate race_result over an optional [yearFrom,yearTo]
+--      window. Wins use position_number = 1; poles/FL use SUM(CASE ... = 1). Ordered by the
+--      computed count DESC. These power the optional era filter on the Records screen.
+--
+-- On-This-Day matches races by calendar month-day (strftime), joins the winner
+-- (race_result.position_number = 1) plus GP + circuit, newest season first.
+-- ============================================================================
+
+-- ---- Precomputed driver leaderboards -------------------------------------
+topDriversByWins:
+SELECT id, full_name, total_race_wins AS value
+FROM driver WHERE total_race_wins > 0
+ORDER BY total_race_wins DESC, full_name ASC LIMIT :limit;
+
+topDriversByPoles:
+SELECT id, full_name, total_pole_positions AS value
+FROM driver WHERE total_pole_positions > 0
+ORDER BY total_pole_positions DESC, full_name ASC LIMIT :limit;
+
+topDriversByPodiums:
+SELECT id, full_name, total_podiums AS value
+FROM driver WHERE total_podiums > 0
+ORDER BY total_podiums DESC, full_name ASC LIMIT :limit;
+
+topDriversByFastestLaps:
+SELECT id, full_name, total_fastest_laps AS value
+FROM driver WHERE total_fastest_laps > 0
+ORDER BY total_fastest_laps DESC, full_name ASC LIMIT :limit;
+
+topDriversByTitles:
+SELECT id, full_name, total_championship_wins AS value
+FROM driver WHERE total_championship_wins > 0
+ORDER BY total_championship_wins DESC, full_name ASC LIMIT :limit;
+
+topDriversByPoints:
+SELECT id, full_name, total_points AS value
+FROM driver WHERE total_points > 0
+ORDER BY total_points DESC, full_name ASC LIMIT :limit;
+
+topDriversByStarts:
+SELECT id, full_name, total_race_starts AS value
+FROM driver WHERE total_race_starts > 0
+ORDER BY total_race_starts DESC, full_name ASC LIMIT :limit;
+
+topDriversByGrandSlams:
+SELECT id, full_name, total_grand_slams AS value
+FROM driver WHERE total_grand_slams > 0
+ORDER BY total_grand_slams DESC, full_name ASC LIMIT :limit;
+
+-- ---- Precomputed constructor leaderboards --------------------------------
+topConstructorsByWins:
+SELECT id, full_name, total_race_wins AS value
+FROM constructor WHERE total_race_wins > 0
+ORDER BY total_race_wins DESC, full_name ASC LIMIT :limit;
+
+topConstructorsByTitles:
+SELECT id, full_name, total_championship_wins AS value
+FROM constructor WHERE total_championship_wins > 0
+ORDER BY total_championship_wins DESC, full_name ASC LIMIT :limit;
+
+topConstructorsByPoles:
+SELECT id, full_name, total_pole_positions AS value
+FROM constructor WHERE total_pole_positions > 0
+ORDER BY total_pole_positions DESC, full_name ASC LIMIT :limit;
+
+topConstructorsByPodiums:
+SELECT id, full_name, total_podiums AS value
+FROM constructor WHERE total_podiums > 0
+ORDER BY total_podiums DESC, full_name ASC LIMIT :limit;
+
+topConstructorsByOneTwos:
+SELECT id, full_name, total_1_and_2_finishes AS value
+FROM constructor WHERE total_1_and_2_finishes > 0
+ORDER BY total_1_and_2_finishes DESC, full_name ASC LIMIT :limit;
+
+topConstructorsByPoints:
+SELECT id, full_name, total_points AS value
+FROM constructor WHERE total_points > 0
+ORDER BY total_points DESC, full_name ASC LIMIT :limit;
+
+-- ---- Era-sliced computed leaderboards ------------------------------------
+-- Wins in an optional [yearFrom,yearTo] window, grouped by driver. NULL bound = open end.
+winsFiltered:
+SELECT d.id, d.full_name, COUNT(*) AS value
+FROM race_result rr
+JOIN race r ON r.id = rr.race_id
+JOIN driver d ON d.id = rr.driver_id
+WHERE rr.position_number = 1
+  AND (:yearFrom IS NULL OR r.year >= :yearFrom)
+  AND (:yearTo IS NULL OR r.year <= :yearTo)
+GROUP BY d.id, d.full_name
+ORDER BY value DESC, d.full_name ASC LIMIT :limit;
+
+-- Poles in an optional window. Pole = race_result.pole_position flag (FACT: never quali P1).
+polesFiltered:
+SELECT d.id, d.full_name, SUM(CASE WHEN rr.pole_position = 1 THEN 1 ELSE 0 END) AS value
+FROM race_result rr
+JOIN race r ON r.id = rr.race_id
+JOIN driver d ON d.id = rr.driver_id
+WHERE (:yearFrom IS NULL OR r.year >= :yearFrom)
+  AND (:yearTo IS NULL OR r.year <= :yearTo)
+GROUP BY d.id, d.full_name
+HAVING value > 0
+ORDER BY value DESC, d.full_name ASC LIMIT :limit;
+
+-- Fastest laps in an optional window.
+fastestLapsFiltered:
+SELECT d.id, d.full_name, SUM(CASE WHEN rr.fastest_lap = 1 THEN 1 ELSE 0 END) AS value
+FROM race_result rr
+JOIN race r ON r.id = rr.race_id
+JOIN driver d ON d.id = rr.driver_id
+WHERE (:yearFrom IS NULL OR r.year >= :yearFrom)
+  AND (:yearTo IS NULL OR r.year <= :yearTo)
+GROUP BY d.id, d.full_name
+HAVING value > 0
+ORDER BY value DESC, d.full_name ASC LIMIT :limit;
+
+-- Podiums (P1/P2/P3) in an optional window.
+podiumsFiltered:
+SELECT d.id, d.full_name, COUNT(*) AS value
+FROM race_result rr
+JOIN race r ON r.id = rr.race_id
+JOIN driver d ON d.id = rr.driver_id
+WHERE rr.position_number IN (1, 2, 3)
+  AND (:yearFrom IS NULL OR r.year >= :yearFrom)
+  AND (:yearTo IS NULL OR r.year <= :yearTo)
+GROUP BY d.id, d.full_name
+ORDER BY value DESC, d.full_name ASC LIMIT :limit;
+
+-- ---- On-This-Day ---------------------------------------------------------
+-- Races whose calendar month-day equals :mmdd ("MM-DD"), joined to the winner.
+-- Only races with a P1 result row appear, so in-progress unrun races self-exclude.
+onThisDay:
+SELECT r.year, gp.name AS gp_name, ci.name AS circuit_name, ci.place_name,
+       d.full_name AS winner_name, c.name AS constructor_name
+FROM race r
+JOIN grand_prix gp ON gp.id = r.grand_prix_id
+JOIN circuit ci ON ci.id = r.circuit_id
+JOIN race_result rr ON rr.race_id = r.id AND rr.position_number = 1
+JOIN driver d ON d.id = rr.driver_id
+JOIN constructor c ON c.id = rr.constructor_id
+WHERE strftime('%m-%d', r.date) = :mmdd
+ORDER BY r.year DESC;

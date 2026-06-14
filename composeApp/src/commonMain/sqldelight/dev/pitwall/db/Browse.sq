@@ -1,0 +1,99 @@
+-- ============================================================================
+-- Feature A — Results / standings / schedule browse.
+-- Labelled SELECTs ONLY (no CREATE — schema lives in F1db.sq). These all hang off
+-- the same db.f1dbQueries accessor as the hero queries.
+--
+-- Conventions honored from F1db.sq:
+--   * order by position_display_order (always populated), NEVER position_number.
+--   * position_text rendered verbatim (DNF/DNQ/NC/DSQ...).
+--   * lap times: COALESCE(q3_millis, q2_millis, q1_millis, time_millis)  (FACT 2).
+--   * poles = race_result.pole_position == 1; never qualifying P1.
+-- ============================================================================
+
+-- All seasons, newest first (drives the Seasons list).
+browseSeasons:
+SELECT year FROM season ORDER BY year DESC;
+
+-- Schedule for a season: round, GP + circuit + place + date, sprint flag, and a
+-- correlated result_count (>0 means the race has been run).
+racesInSeason:
+SELECT r.id AS race_id, r.round, g.name AS gp_name, c.name AS circuit_name,
+       c.place_name, r.date, r.sprint_qualifying_format,
+       (SELECT COUNT(*) FROM race_result rr WHERE rr.race_id = r.id) AS result_count
+FROM race r
+JOIN grand_prix g ON g.id = r.grand_prix_id
+JOIN circuit c ON c.id = r.circuit_id
+WHERE r.year = :year
+ORDER BY r.round;
+
+-- Race classification: pos verbatim, driver, constructor, grid, points, time/gap,
+-- laps, retirement reason, FL + pole markers.
+raceResult:
+SELECT rr.position_text, d.full_name AS driver_name, c.name AS constructor_name,
+       rr.grid_position_number, rr.points, rr.time, rr.gap, rr.laps,
+       rr.reason_retired, rr.fastest_lap, rr.pole_position
+FROM race_result rr
+JOIN driver d ON d.id = rr.driver_id
+JOIN constructor c ON c.id = rr.constructor_id
+WHERE rr.race_id = :raceId
+ORDER BY rr.position_display_order;
+
+-- Qualifying classification: pos verbatim, driver, Q1/Q2/Q3 + coalesced best time, gap.
+qualifyingResult:
+SELECT q.position_text, d.full_name AS driver_name,
+       q.q1_millis, q.q2_millis, q.q3_millis,
+       COALESCE(q.q3_millis, q.q2_millis, q.q1_millis, q.time_millis) AS best_millis,
+       q.gap
+FROM qualifying_result q
+JOIN driver d ON d.id = q.driver_id
+WHERE q.race_id = :raceId
+ORDER BY q.position_display_order;
+
+-- Sprint race classification.
+sprintRaceResult:
+SELECT s.position_text, d.full_name AS driver_name, c.name AS constructor_name,
+       s.points, s.gap, s.reason_retired
+FROM sprint_race_result s
+JOIN driver d ON d.id = s.driver_id
+JOIN constructor c ON c.id = s.constructor_id
+WHERE s.race_id = :raceId
+ORDER BY s.position_display_order;
+
+-- Sprint qualifying classification (no constructor column on this view).
+sprintQualifyingResult:
+SELECT sq.position_text, d.full_name AS driver_name,
+       sq.q1_millis, sq.q2_millis, sq.q3_millis,
+       COALESCE(sq.q3_millis, sq.q2_millis, sq.q1_millis, sq.time_millis) AS best_millis
+FROM sprint_qualifying_result sq
+JOIN driver d ON d.id = sq.driver_id
+WHERE sq.race_id = :raceId
+ORDER BY sq.position_display_order;
+
+-- Final season driver championship.
+seasonDriverStanding:
+SELECT sds.position_text, d.full_name AS driver_name, sds.points, sds.championship_won
+FROM season_driver_standing sds
+JOIN driver d ON d.id = sds.driver_id
+WHERE sds.year = :year
+ORDER BY sds.position_display_order;
+
+-- Final season constructor championship.
+seasonConstructorStanding:
+SELECT scs.position_text, c.name AS constructor_name, scs.points, scs.championship_won
+FROM season_constructor_standing scs
+JOIN constructor c ON c.id = scs.constructor_id
+WHERE scs.year = :year
+ORDER BY scs.position_display_order;
+
+-- Per-session row counts -> drives which result tabs are shown.
+countQualifying:
+SELECT COUNT(*) FROM qualifying_result WHERE race_id = :raceId;
+
+countSprintQualifying:
+SELECT COUNT(*) FROM sprint_qualifying_result WHERE race_id = :raceId;
+
+countSprint:
+SELECT COUNT(*) FROM sprint_race_result WHERE race_id = :raceId;
+
+countRace:
+SELECT COUNT(*) FROM race_result WHERE race_id = :raceId;

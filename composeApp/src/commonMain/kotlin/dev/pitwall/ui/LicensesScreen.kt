@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.pitwall.data.DATASET_LABEL
 
 @Composable
 fun LicensesScreen() = Column(Modifier.padding(16.dp)) {
@@ -18,6 +19,8 @@ fun LicensesScreen() = Column(Modifier.padding(16.dp)) {
         "Historical data: F1DB (github.com/f1db/f1db), licensed CC BY 4.0 " +
             "(creativecommons.org/licenses/by/4.0/). Bundled and transformed for offline use.",
     )
+    Spacer(Modifier.height(8.dp))
+    Text(DATASET_LABEL, style = MaterialTheme.typography.labelMedium)
     Spacer(Modifier.height(12.dp))
     Text(
         "PitWall is an unofficial fan project, not associated with Formula 1. " +

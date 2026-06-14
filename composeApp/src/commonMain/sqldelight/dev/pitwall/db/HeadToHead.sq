@@ -1,0 +1,68 @@
+-- ============================================================================
+-- Feature B — Career & teammate head-to-head.
+-- Labelled SELECTs only. All declarations live in F1db.sq (the shared schema);
+-- these queries hang off the same db.f1dbQueries accessor.
+--
+-- FACT 2: from 2006+ qualifying_result.time_millis is mostly NULL — the real lap
+-- time is COALESCE(q3_millis, q2_millis, q1_millis, time_millis). best_millis
+-- below carries that coalesced value; the engine consumes it directly.
+--
+-- The "common races" set is the INTERSECT of each driver's own race set (the shape
+-- from the plan). A named parameter used more than once (:driverA / :driverB) is
+-- bound once by the caller; SQLDelight reuses the single bind for every occurrence.
+-- ============================================================================
+
+-- Driver picker: substring match on full_name, most-experienced first.
+searchDrivers:
+SELECT id, full_name, total_race_wins, total_championship_wins
+FROM driver
+WHERE full_name LIKE ('%' || :query || '%')
+ORDER BY total_race_starts DESC
+LIMIT 50;
+
+-- Precomputed career totals for the side-by-side totals card.
+driverCareerTotals:
+SELECT id, full_name, total_race_wins, total_podiums, total_pole_positions,
+       total_fastest_laps, total_points, total_championship_wins, total_race_starts
+FROM driver
+WHERE id = :driverId;
+
+-- Every qualifying row for either driver on races BOTH contested, coalesced best time.
+commonQualifyingRows:
+SELECT q.race_id, r.year, q.driver_id, q.constructor_id,
+       COALESCE(q.q3_millis, q.q2_millis, q.q1_millis, q.time_millis) AS best_millis
+FROM qualifying_result q
+JOIN race r ON r.id = q.race_id
+WHERE q.driver_id IN (:driverA, :driverB)
+  AND q.race_id IN (
+    SELECT race_id FROM qualifying_result WHERE driver_id = :driverA
+    INTERSECT
+    SELECT race_id FROM qualifying_result WHERE driver_id = :driverB
+  )
+ORDER BY r.year, q.race_id;
+
+-- Race finishes for either driver on races where BOTH were classified (position_number IS NOT NULL).
+commonRaceFinishes:
+SELECT rr.race_id, r.year, rr.driver_id, rr.constructor_id, rr.position_number
+FROM race_result rr
+JOIN race r ON r.id = rr.race_id
+WHERE rr.driver_id IN (:driverA, :driverB)
+  AND rr.position_number IS NOT NULL
+  AND rr.race_id IN (
+    SELECT race_id FROM race_result WHERE driver_id = :driverA AND position_number IS NOT NULL
+    INTERSECT
+    SELECT race_id FROM race_result WHERE driver_id = :driverB AND position_number IS NOT NULL
+  )
+ORDER BY r.year, rr.race_id;
+
+-- Seat/era rows for either driver at any constructor they ever shared (supplementary context).
+sharedSeats:
+SELECT year, constructor_id, driver_id, rounds
+FROM season_entrant_driver
+WHERE driver_id IN (:driverA, :driverB)
+  AND constructor_id IN (
+    SELECT constructor_id FROM season_entrant_driver WHERE driver_id = :driverA
+    INTERSECT
+    SELECT constructor_id FROM season_entrant_driver WHERE driver_id = :driverB
+  )
+ORDER BY year, constructor_id;
