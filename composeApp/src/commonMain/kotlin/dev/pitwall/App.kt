@@ -39,6 +39,7 @@ import dev.pitwall.ui.browse.StandingsScreen
 import dev.pitwall.ui.h2h.HeadToHeadScreen
 import dev.pitwall.ui.records.OnThisDayScreen
 import dev.pitwall.ui.records.RecordsScreen
+import dev.pitwall.ui.telemetry.TelemetryHost
 import dev.pitwall.ui.title.TitleCalculatorScreen
 
 /** Top-level destinations. Glyphs are emoji (no icon-pack dependency). */
@@ -47,6 +48,7 @@ private enum class Dest(val label: String, val glyph: String) {
     BROWSE("Browse", "📅"),
     COMPARE("Compare", "⚖️"),
     TITLE("Title Race", "🏆"),
+    CARDATA("Car Data", "📈"),
     RECORDS("Records", "📊"),
     ABOUT("About", "ℹ️"),
 }
@@ -98,6 +100,7 @@ private fun DestinationContent(dest: Dest, modifier: Modifier) = Box(modifier) {
         Dest.BROWSE -> BrowseHost()
         Dest.COMPARE -> HeadToHeadScreen()
         Dest.TITLE -> TitleCalculatorScreen()
+        Dest.CARDATA -> TelemetryHost()
         Dest.RECORDS -> RecordsHost()
         Dest.ABOUT -> LicensesScreen()
     }

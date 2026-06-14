@@ -3,7 +3,9 @@ package dev.pitwall.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.pitwall.data.F1Repository
-import dev.pitwall.domain.DriverCarRating
+import dev.pitwall.data.TelemetryRepository
+import dev.pitwall.domain.HeroRow
+import dev.pitwall.domain.mergeRacePace
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,12 +16,15 @@ import kotlinx.coroutines.withContext
 data class UiState(
     val seasons: List<Int> = emptyList(),
     val selectedYear: Int? = null,
-    val rows: List<Pair<DriverCarRating, String>> = emptyList(),
+    val rows: List<HeroRow> = emptyList(),
     val loading: Boolean = true,
     val error: String? = null,
 )
 
-class DriverVsCarViewModel(private val repo: F1Repository) : ViewModel() {
+class DriverVsCarViewModel(
+    private val repo: F1Repository,
+    private val telemetry: TelemetryRepository,
+) : ViewModel() {
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state
 
@@ -35,7 +40,13 @@ class DriverVsCarViewModel(private val repo: F1Repository) : ViewModel() {
                 val result = withContext(Dispatchers.Default) {
                     val s = repo.seasons()
                     val y = year ?: s.firstOrNull() ?: return@withContext null
-                    Triple(s, y, repo.ratingsForSeason(y.toLong()))
+                    val ratings = repo.ratingsForSeason(y.toLong())
+                    // Race-pace companion (2018+). Best-effort: the qualifying hero is the flagship
+                    // offline feature and must never break if telemetry is absent/empty. Flip the sign
+                    // so positive = faster, matching oneLapRatingPct (the bake uses negative = faster).
+                    val pace = runCatching { telemetry.heroRacePace(y).mapValues { -it.value } }
+                        .getOrDefault(emptyMap())
+                    Triple(s, y, mergeRacePace(ratings, pace))
                 }
                 _state.value = result?.let { (seasons, chosen, rows) ->
                     UiState(seasons, chosen, rows, loading = false)

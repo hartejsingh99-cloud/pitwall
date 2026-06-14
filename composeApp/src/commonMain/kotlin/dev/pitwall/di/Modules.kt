@@ -13,5 +13,7 @@ fun appModule(driverPath: String): Module = module {
     single<SqlDriver> { makeF1dbDriver(driverPath) }
     single { F1db(get()) }            // DB is pre-populated — never call F1db.Schema.create
     single { F1Repository(get()) }
-    factory { DriverVsCarViewModel(get()) }
+    // second get() = TelemetryRepository (from telemetryModule, resolved cross-module at startup) for
+    // the race-pace companion. Best-effort inside the VM, so a missing telemetry DB won't break the hero.
+    factory { DriverVsCarViewModel(get(), get()) }
 }

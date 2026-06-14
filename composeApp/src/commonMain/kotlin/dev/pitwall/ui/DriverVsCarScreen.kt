@@ -64,11 +64,13 @@ fun DriverVsCarScreen(vm: DriverVsCarViewModel = koinViewModel()) {
             Text(error, style = MaterialTheme.typography.bodyLarge)
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
-                items(s.rows) { (r, name) ->
+                items(s.rows) { row ->
+                    val r = row.rating
+                    val racePace = row.racePacePct?.let { " · race ${formatSignedPct(it)}" } ?: ""
                     ListItem(
-                        headlineContent = { Text(name, fontWeight = FontWeight.SemiBold) },
+                        headlineContent = { Text(row.name, fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
-                            Text("${formatSignedPct(r.oneLapRatingPct)} vs teammate · H2H ${r.headToHeadWins}/${r.events}")
+                            Text("quali ${formatSignedPct(r.oneLapRatingPct)} vs teammate · H2H ${r.headToHeadWins}/${r.events}$racePace")
                         },
                     )
                     HorizontalDivider()

@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.pitwall.data.DATASET_LABEL
+import dev.pitwall.data.TELEMETRY_LABEL
 
 @Composable
 fun LicensesScreen() = Column(Modifier.padding(16.dp)) {
@@ -21,6 +22,13 @@ fun LicensesScreen() = Column(Modifier.padding(16.dp)) {
     )
     Spacer(Modifier.height(8.dp))
     Text(DATASET_LABEL, style = MaterialTheme.typography.labelMedium)
+    Spacer(Modifier.height(12.dp))
+    Text(
+        "Car data: built locally with FastF1 (github.com/theOehrly/Fast-F1, MIT), which sources timing " +
+            "and telemetry data. Pre-computed offline; no live connection.",
+    )
+    Spacer(Modifier.height(8.dp))
+    Text(TELEMETRY_LABEL, style = MaterialTheme.typography.labelMedium)
     Spacer(Modifier.height(12.dp))
     Text(
         "PitWall is an unofficial fan project, not associated with Formula 1. " +

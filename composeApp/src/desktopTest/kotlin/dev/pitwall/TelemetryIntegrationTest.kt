@@ -44,7 +44,7 @@ class TelemetryIntegrationTest {
         assertNotNull(ch, "channel should decode")
         assertTrue(ch.distance.isNotEmpty(), "distance axis present")
         assertNotNull(ch.speed)
-        assertEquals(ch.distance.size, ch.speed!!.size, "speed aligns to distance (validated)")
+        assertEquals(ch.distance.size, ch.speed.size, "speed aligns to distance (validated)")
     }
 
     @Test fun deltaBetweenDriversStartsAtZero() {

@@ -3,6 +3,8 @@ package dev.pitwall.di
 import dev.pitwall.data.TelemetryRepository
 import dev.pitwall.data.makeTelemetryDriver
 import dev.pitwall.telemetrydb.TelemetryDb
+import dev.pitwall.ui.telemetry.TelemetrySessionViewModel
+import dev.pitwall.ui.telemetry.TelemetrySessionsViewModel
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -15,4 +17,6 @@ import org.koin.dsl.module
 fun telemetryModule(telemetryPath: String): Module = module {
     single { TelemetryDb(makeTelemetryDriver(telemetryPath)) }
     single { TelemetryRepository(get()) }
+    factory { TelemetrySessionsViewModel(get()) }
+    factory { params -> TelemetrySessionViewModel(get(), params.get()) }
 }

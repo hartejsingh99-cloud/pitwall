@@ -92,7 +92,6 @@ class TelemetryRepository(private val db: TelemetryDb) {
 
     /** Map driverId -> race-pace % vs teammate for [year]'s race sessions (feeds the hero's 2018+ companion). */
     fun heroRacePace(year: Int): Map<String, Double> =
-        q.heroRacePace(year.toLong()).executeAsList()
-            .mapNotNull { row -> row.pace_pct_vs_team?.let { row.driver_id to it } }
-            .toMap()
+        // the query's WHERE pace_pct_vs_team IS NOT NULL makes the column non-null in the generated row.
+        q.heroRacePace(year.toLong()).executeAsList().associate { it.driver_id to it.pace_pct_vs_team }
 }
