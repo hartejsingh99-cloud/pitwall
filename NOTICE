@@ -2,5 +2,12 @@ PitWall bundles the F1DB dataset (https://github.com/f1db/f1db),
 licensed under Creative Commons Attribution 4.0 International (CC BY 4.0):
 https://creativecommons.org/licenses/by/4.0/
 The dataset has been transformed (packaged into the app and queried). Bundled f1db copy: data through the 2026 season Round 6 (Monaco) — 6 of 22 rounds run.
+Bundled f1db release: v2026.6.3
+
+PitWall also builds car-data (telemetry) locally with FastF1
+(https://github.com/theOehrly/Fast-F1), licensed under the MIT License, which
+sources timing and telemetry data. This data is pre-computed offline and bundled;
+no live connection is made by the app.
+
 PitWall is an unofficial fan project, not associated with Formula 1.
 F1, FORMULA 1, FORMULA ONE and related marks are trademarks of Formula One Licensing B.V.

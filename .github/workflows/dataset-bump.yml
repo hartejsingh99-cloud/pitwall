@@ -1,0 +1,49 @@
+name: f1db dataset bump check
+on:
+  schedule:
+    - cron: '17 6 * * 1'            # Mondays 06:17 UTC, after a typical race weekend
+  workflow_dispatch: {}             # manual trigger too
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare pinned vs latest f1db
+        id: cmp
+        run: |
+          PINNED="$(cat f1db.version)"
+          LATEST="$(curl -fsSL https://api.github.com/repos/f1db/f1db/releases/latest | jq -r .tag_name)"
+          echo "pinned=$PINNED" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          if [ "$PINNED" != "$LATEST" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Bump pin + DATASET_VERSION + NOTICE version line
+        if: steps.cmp.outputs.changed == 'true'
+        run: |
+          NEW="${{ steps.cmp.outputs.latest }}"
+          echo "$NEW" > f1db.version
+          # increment the DATASET_VERSION integer so installed apps re-extract the new bundled DB
+          perl -i -pe 's/(DATASET_VERSION\s*=\s*)(\d+)/$1.($2+1)/e' \
+            composeApp/src/commonMain/kotlin/dev/pitwall/data/DbFile.kt
+          # keep the CC-BY release pin honest (the "Bundled f1db release: vYYYY.RR.MICRO" line)
+          perl -i -pe "s/v\d{4}\.\d+\.\d+/$NEW/g" NOTICE
+      - name: Open PR
+        if: steps.cmp.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/f1db-${{ steps.cmp.outputs.latest }}
+          title: "chore: bump bundled f1db to ${{ steps.cmp.outputs.latest }}"
+          body: |
+            Automated dataset bump from `${{ steps.cmp.outputs.pinned }}` to `${{ steps.cmp.outputs.latest }}`.
+
+            - Updated `f1db.version`, incremented `DATASET_VERSION`, refreshed the f1db release line in `NOTICE`.
+            - **Review manually:** update the prose data window in `DbFile.kt` `DATASET_LABEL`
+              ("data through 20xx Rn (…)") and the f1db line in `LicensesScreen.kt` if the round changed.
+            - On merge, CI rebuilds with the pinned release; tag `vX.Y.Z` to ship to the friend group.
+
+            The 70 MB `.db` is never downloaded here — CI fetches it from the pin at build time, so this PR is tiny.
+          labels: dataset, automated
