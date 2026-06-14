@@ -75,6 +75,34 @@ class DeltaTimeTest {
         assertEquals(0.0, py.last(), 1e-9)
     }
 
+    @Test fun resampleByDistance_interpolatesAndClamps() {
+        val srcD = listOf(0.0, 100.0, 200.0)
+        val srcV = listOf(0.0, 10.0, 30.0)
+        val out = resampleByDistance(srcD, srcV, listOf(0.0, 50.0, 150.0, 200.0))
+        assertEquals(0.0, out[0], 1e-9)    // exact start
+        assertEquals(5.0, out[1], 1e-9)    // midpoint of 0..10
+        assertEquals(20.0, out[2], 1e-9)   // midpoint of 10..30
+        assertEquals(30.0, out[3], 1e-9)   // exact end
+    }
+
+    @Test fun resampleByDistance_clampsOutsideRange() {
+        val out = resampleByDistance(listOf(10.0, 20.0), listOf(1.0, 2.0), listOf(0.0, 30.0))
+        assertEquals(1.0, out.first(), 1e-9)   // below range -> first value
+        assertEquals(2.0, out.last(), 1e-9)    // above range -> last value
+    }
+
+    @Test fun resampleByDistance_letsDeltaCompareMisalignedGrids() {
+        // two laps sampled on DIFFERENT distance grids; resample comparison onto reference grid first.
+        val refDist = listOf(0.0, 100.0, 200.0)
+        val refTime = listOf(0.0, 2.0, 4.0)
+        val cmpDist = listOf(0.0, 50.0, 150.0, 200.0)
+        val cmpTime = listOf(0.0, 1.05, 3.15, 4.4)
+        val cmpOnRef = resampleByDistance(cmpDist, cmpTime, refDist)
+        val d = deltaTime(LapTrace(refDist, refTime), LapTrace(refDist, cmpOnRef))
+        assertEquals(0.0, d.first(), 1e-9)
+        assertTrue(d.last() > 0.0)
+    }
+
     @Test fun scaleToCanvas_degenerateRange_usesMidline() {
         val (px, py) = scaleToCanvas(listOf(5.0, 5.0), listOf(7.0, 7.0), w = 100.0, h = 40.0, pad = 0.0)
         assertTrue(px.all { it == 50.0 })

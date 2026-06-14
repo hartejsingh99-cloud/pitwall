@@ -1,0 +1,89 @@
+-- TelemetryDb schema — 1:1 with tools/bake/schema.sql. The bundled telemetry.db is pre-populated,
+-- so Schema.create() is never called (same contract as f1db). One *Queries class per .sq file ->
+-- the accessor is telemetryDb.telemetryQueries. Types: TEXT->String, INTEGER->Long, REAL->Double;
+-- columns without NOT NULL are nullable.
+
+CREATE TABLE session (
+  id            TEXT PRIMARY KEY NOT NULL,
+  year          INTEGER NOT NULL,
+  round         INTEGER NOT NULL,
+  session_type  TEXT NOT NULL,
+  event_name    TEXT NOT NULL,
+  circuit_name  TEXT NOT NULL,
+  baked_at      TEXT NOT NULL
+);
+
+CREATE TABLE lap (
+  session_id    TEXT NOT NULL,
+  driver_id     TEXT NOT NULL,
+  driver_label  TEXT NOT NULL,
+  lap_number    INTEGER NOT NULL,
+  lap_time_ms   INTEGER,
+  compound      TEXT,
+  tyre_life     INTEGER,
+  stint         INTEGER,
+  is_accurate   INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (session_id, driver_id, lap_number)
+);
+
+CREATE TABLE telemetry_channel (
+  session_id    TEXT NOT NULL,
+  driver_id     TEXT NOT NULL,
+  lap_number    INTEGER NOT NULL,
+  distance      TEXT NOT NULL,
+  speed         TEXT,
+  throttle      TEXT,
+  brake         TEXT,
+  gear          TEXT,
+  drs           TEXT,
+  x             TEXT,
+  y             TEXT,
+  PRIMARY KEY (session_id, driver_id, lap_number)
+);
+
+CREATE TABLE driver_pace (
+  session_id        TEXT NOT NULL,
+  driver_id         TEXT NOT NULL,
+  driver_label      TEXT NOT NULL,
+  median_pace_ms    INTEGER,
+  pace_pct_vs_team  REAL,
+  deg_ms_per_lap    REAL,
+  PRIMARY KEY (session_id, driver_id)
+);
+
+-- ---- Queries -------------------------------------------------------------
+
+sessions:
+SELECT id, year, round, session_type, event_name, circuit_name, baked_at
+FROM session
+ORDER BY year DESC, round ASC, session_type ASC;
+
+driversForSession:
+SELECT DISTINCT driver_id, driver_label
+FROM lap WHERE session_id = ?
+ORDER BY driver_label ASC;
+
+lapsForSession:
+SELECT driver_id, driver_label, lap_number, lap_time_ms, compound, tyre_life, stint, is_accurate
+FROM lap WHERE session_id = ?
+ORDER BY driver_label ASC, lap_number ASC;
+
+channelForLap:
+SELECT distance, speed, throttle, brake, gear, drs, x, y
+FROM telemetry_channel
+WHERE session_id = ? AND driver_id = ? AND lap_number = ?;
+
+channelsForSession:
+SELECT driver_id, lap_number, distance, speed, throttle, brake, gear, drs, x, y
+FROM telemetry_channel WHERE session_id = ?;
+
+paceForSession:
+SELECT driver_id, driver_label, median_pace_ms, pace_pct_vs_team, deg_ms_per_lap
+FROM driver_pace WHERE session_id = ?
+ORDER BY median_pace_ms ASC;
+
+heroRacePace:
+SELECT dp.driver_id, dp.pace_pct_vs_team
+FROM driver_pace dp
+JOIN session s ON s.id = dp.session_id
+WHERE s.year = ? AND s.session_type = 'R' AND dp.pace_pct_vs_team IS NOT NULL;

@@ -30,6 +30,34 @@ fun cumulativeTimeFromSpeed(distance: List<Double>, speedKmh: List<Double>): Lis
 }
 
 /**
+ * Linearly interpolate a series [srcValues] defined on the ascending axis [srcDist] onto [targetDist].
+ * Targets outside the source range clamp to the endpoints. This lets delta-time compare two laps whose
+ * decimated distance grids differ slightly (real telemetry rarely lands on identical samples) by first
+ * projecting the comparison lap's cumulative-time trace onto the reference lap's grid.
+ */
+fun resampleByDistance(
+    srcDist: List<Double>,
+    srcValues: List<Double>,
+    targetDist: List<Double>,
+): List<Double> {
+    require(srcDist.size == srcValues.size) { "srcDist and srcValues must be the same length" }
+    require(srcDist.isNotEmpty()) { "empty source" }
+    if (srcDist.size == 1) return targetDist.map { srcValues[0] }
+    return targetDist.map { d ->
+        when {
+            d <= srcDist.first() -> srcValues.first()
+            d >= srcDist.last() -> srcValues.last()
+            else -> {
+                val i = srcDist.indexOfLast { it <= d }
+                val x0 = srcDist[i]; val x1 = srcDist[i + 1]
+                val y0 = srcValues[i]; val y1 = srcValues[i + 1]
+                if (x1 == x0) y0 else y0 + (y1 - y0) * (d - x0) / (x1 - x0)
+            }
+        }
+    }
+}
+
+/**
  * Normalize parallel (x, y) data into a [w]×[h] pixel box with [pad] inset, returning (pixelX, pixelY).
  * Y is FLIPPED so larger data-y draws upward (screen y grows downward). A degenerate (zero-range) axis
  * collapses to the box midline. Pure scaling math behind every Canvas chart (telemetry/track-dominance).

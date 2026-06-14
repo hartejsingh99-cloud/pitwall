@@ -56,8 +56,17 @@ kotlin {
 
 sqldelight {
     databases {
+        // Two databases in one module — give each a NON-OVERLAPPING srcDir so they never compile
+        // each other's .sq (both otherwise default to src/commonMain/sqldelight). One *Queries class
+        // per .sq file: db.f1dbQueries / telemetryDb.telemetryQueries.
         create("F1db") {
             packageName.set("dev.pitwall.db")
+            srcDirs.setFrom("src/commonMain/sqldelight")
+            verifyMigrations.set(false)
+        }
+        create("TelemetryDb") {
+            packageName.set("dev.pitwall.telemetrydb")
+            srcDirs.setFrom("src/commonMain/sqldelight-telemetry")
             verifyMigrations.set(false)
         }
     }
