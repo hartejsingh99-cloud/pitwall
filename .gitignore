@@ -10,3 +10,8 @@ local.properties
 # Present in the working tree for local builds; CI/release plan fetches it at build time
 # (scripts/fetch_f1db.sh + a checked-in f1db.version pin + sha256). See docs/superpowers/plans/2026-06-14-pitwall-ci-release.md
 composeApp/src/commonMain/composeResources/files/f1db.db
+
+# Bundled telemetry dataset — NOT committed (no data blobs in git history). Generated locally:
+# synthetic seed via tools/bake/make_sample_db.py, or real data via tools/bake/bake.py (FastF1).
+# See docs/superpowers/plans/2026-06-14-pitwall-phase2-offline-telemetry.md
+composeApp/src/commonMain/composeResources/files/telemetry.db

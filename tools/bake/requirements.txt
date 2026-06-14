@@ -1,0 +1,7 @@
+# Real telemetry bake (bake.py / extract.py). Re-verify against PyPI at run time — these churn.
+# The pure transforms (transform.py) and the synthetic generator (make_sample_db.py) need NONE of
+# this — they are stdlib only and tested with `python3 -m unittest`.
+fastf1==3.8.3          # SINGLE session.load(laps=True, telemetry=True) call (avoids #852 dup bug)
+pandas<3
+numpy<3
+scipy<2                # tyre-deg / smoothing helpers if used beyond the stdlib least-squares fit
