@@ -88,7 +88,12 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg)
             packageName = "PitWall"
-            packageVersion = "0.1.0"
+            // macOS/jpackage requires the major version to be >= 1; the app is conceptually 0.1.0
+            // (see Android versionName + the git tag).
+            packageVersion = "1.0.0"
+            macOS {
+                bundleID = "dev.pitwall"
+            }
         }
     }
 }
