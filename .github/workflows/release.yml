@@ -10,8 +10,8 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '17', cache: gradle }
       - uses: android-actions/setup-android@v4
         with: { log-accepted-android-sdk-licenses: false }
@@ -20,28 +20,28 @@ jobs:
       # Rename so the friend-facing asset is "PitWall-<tag>.apk" — no F1 mark in any downloaded filename.
       - name: Name the APK
         run: cp composeApp/build/outputs/apk/debug/composeApp-debug.apk "PitWall-${{ github.ref_name }}.apk"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: apk, path: "PitWall-*.apk", if-no-files-found: error }
 
   build-dmg:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '17', cache: gradle }
       - uses: android-actions/setup-android@v4
         with: { log-accepted-android-sdk-licenses: false }
       - run: ./scripts/fetch_f1db.sh && ./scripts/fetch_telemetry.sh
       - run: ./gradlew :composeApp:packageDmg
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: dmg, path: composeApp/build/compose/binaries/main/dmg/*.dmg, if-no-files-found: error }
 
   release:
     needs: [build-apk, build-dmg]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4    # for the release-notes body
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v6    # for the release-notes body
+      - uses: actions/download-artifact@v8
         with: { path: dist }
       - uses: softprops/action-gh-release@v2
         with:
